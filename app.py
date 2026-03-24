@@ -553,6 +553,18 @@ def create_home_page(cache):
         df_ev['fecha_dt'] = pd.to_datetime(df_ev['fecha'])
         proximos = df_ev[df_ev['fecha_dt'] >= pd.Timestamp.now().normalize()].sort_values('fecha_dt').head(6)
 
+    # Historial de derrames
+    derrames_lista = []
+    if not eventos_df.empty:
+        mask = eventos_df['evento'].str.contains('derrama', case=False, na=False)
+        derrames_df = eventos_df[mask].copy()
+        for _, row in derrames_df.iterrows():
+            texto = str(row['evento']) + ' ' + str(row.get('tipo', ''))
+            match = re.search(r'(\d+(?:[.,]\d+)?)\s*€', texto)
+            importe = match.group(1) + ' €' if match else None
+            derrames_lista.append({'fecha': row['fecha'], 'evento': row['evento'], 'importe': importe})
+        derrames_lista.sort(key=lambda x: x['fecha'], reverse=True)
+
     # 3. Diseño de Noticias
     items_noticias = []
     for i, row in enumerate(noticias_df.to_dict('records')):
@@ -691,6 +703,26 @@ def create_home_page(cache):
                     dbc.CardBody(items_noticias, style={"maxHeight": "300px", "overflowY": "auto"})
                 ])
             ]),
+        ]),
+
+        dbc.Row([
+            dbc.Col(width=12, children=[
+                dbc.Card(className="mb-4 glass-container", children=[
+                    dbc.CardHeader(html.H4("💸 Historial de Derrames", className="m-0")),
+                    dbc.ListGroup([
+                        dbc.ListGroupItem([
+                            html.Div(className="d-flex justify-content-between align-items-center", children=[
+                                html.Div([
+                                    html.Span("📅 ", style={"fontSize": "0.85rem"}),
+                                    html.Small(d['fecha'], className="text-muted fw-bold"),
+                                    html.Div(d['evento'], style={"fontWeight": "600", "marginTop": "2px"}),
+                                ]),
+                                dbc.Badge(d['importe'], color="danger", className="fs-6") if d['importe'] else dbc.Badge("Sense import", color="secondary")
+                            ])
+                        ]) for d in derrames_lista
+                    ] if derrames_lista else [dbc.ListGroupItem("No hi ha derrames registrades.", className="text-muted")], flush=True)
+                ])
+            ])
         ]),
 
         dbc.Row([
