@@ -1623,7 +1623,8 @@ def agregar_item_lista(n_clicks, fecha, objeto, pathname, comidas, eventos, fies
 
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
-     Output('output-evento', 'children')],
+     Output('output-evento', 'children'),
+     Output('store-eventos', 'data', allow_duplicate=True)],
     Input('btn-agregar-evento', 'n_clicks'),
     [State('evento-nueva-fecha', 'date'),
      State('evento-nuevo-nombre', 'value'),
@@ -1640,21 +1641,23 @@ def agregar_item_lista(n_clicks, fecha, objeto, pathname, comidas, eventos, fies
 def agregar_evento(n_clicks, fecha, nombre, tipo, pathname, comidas, eventos, fiestas, mant, lista, cambios):
     if not n_clicks or not nombre:
         raise PreventUpdate
-    
+
     dm.add_data('eventos', (fecha, nombre, tipo or ''))
     registrar_cambio('Eventos', f'Evento añadido: {nombre}')
 
     # Formatear mensaje para Telegram
     mensaje = f"📅 *Nou event afegit!*\n\n*{nombre}*\nData: {fecha}\nTipus: {tipo or 'No especificat'}"
     enviar_notificacion_telegram(mensaje)
-    
-    eventos_df = dm.get_data('eventos')
+
+    eventos_df = dm.get_eventos_proximos(limit=20)
+    eventos_records = eventos_df.to_dict('records')
     cache = {
-        'comidas': comidas or [], 'eventos': eventos_df.to_dict('records'), 'fiestas': fiestas or [],
+        'comidas': comidas or [], 'eventos': eventos_records, 'fiestas': fiestas or [],
         'mantenimiento': mant or [], 'lista_compra': lista or [], 'cambios': cambios or []
     }
-    
-    return create_eventos_page(cache) if pathname == '/eventos' else dash.no_update, dbc.Alert(f"✅ '{nombre}' añadido", color="success", duration=3000)
+
+    page = create_eventos_page(cache) if pathname == '/eventos' else dash.no_update
+    return page, dbc.Alert(f"✅ '{nombre}' añadido", color="success", duration=3000), eventos_records
 
 # CALLBACK 1: Habilita y llena el dropdown de fechas cuando se elige un tipo de comida.
 @app.callback(

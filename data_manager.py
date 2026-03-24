@@ -180,32 +180,37 @@ class DataManager:
             return False
     
     def add_data(self, table, data):
-        """Agregar nueva fila a una tabla"""
-        df = self.get_data(table)
-        
-        new_id = 1 if len(df) == 0 else int(df['id'].max()) + 1
-        
+        """Agregar nueva fila a una tabla usando INSERT directo (seguro con múltiples workers)"""
         schemas = {
-            'comidas': ['id', 'fecha', 'dia', 'tipo_comida', 'cocineros'],
-            'lista_compra': ['id', 'fecha', 'objeto'],
-            'mantenimiento': ['id', 'año', 'mantenimiento', 'cadafals'],
-            'eventos': ['id', 'fecha', 'evento', 'tipo'],
-            'fiestas': ['id', 'fecha', 'cocineros', 'menu', 'adultos', 'nombres_adultos', 'niños', 'nombres_niños', 'programa'],
-            'cambios': ['id', 'fecha', 'tipo_cambio', 'descripcion', 'usuario'],
-            'reuniones': ['id', 'fecha', 'temas', 'asistentes', 'estado']  
+            'comidas': ['fecha', 'dia', 'tipo_comida', 'cocineros'],
+            'lista_compra': ['fecha', 'objeto'],
+            'mantenimiento': ['año', 'mantenimiento', 'cadafals'],
+            'eventos': ['fecha', 'evento', 'tipo'],
+            'fiestas': ['fecha', 'cocineros', 'menu', 'adultos', 'nombres_adultos', 'niños', 'nombres_niños', 'programa'],
+            'cambios': ['fecha', 'tipo_cambio', 'descripcion', 'usuario'],
+            'reuniones': ['fecha', 'temas', 'asistentes', 'estado']
         }
-        
+
         columns = schemas.get(table, [])
-        new_row = {'id': new_id}
-        
-        for i, col in enumerate(columns[1:]):
+        values = {}
+        for i, col in enumerate(columns):
             if i < len(data):
-                new_row[col] = data[i]
+                values[col] = data[i]
             else:
-                new_row[col] = 0 if col in ['adultos', 'niños', 'año'] else ''
-        
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-        return self.save_data(table, df)
+                values[col] = 0 if col in ['adultos', 'niños', 'año'] else ''
+
+        cols_sql = ', '.join(values.keys())
+        placeholders = ', '.join([f':{k}' for k in values.keys()])
+        query = text(f"INSERT INTO {table} ({cols_sql}) VALUES ({placeholders})")
+
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(query, values)
+                conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error insertando en {table}: {e}")
+            return False
     
     # ==========================================
     # NUEVOS MÉTODOS OPTIMIZADOS
