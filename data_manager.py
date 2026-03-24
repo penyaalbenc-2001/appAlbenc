@@ -231,17 +231,18 @@ class DataManager:
         """
         try:
             query = f"SELECT * FROM {table}"
-            
+
             if where_clause:
                 query += f" WHERE {where_clause}"
-            
+
             if order_by:
                 query += f" ORDER BY {order_by}"
-            
+
             if limit:
                 query += f" LIMIT {limit}"
-            
-            return pd.read_sql(query, self.engine)
+
+            with self.engine.connect() as conn:
+                return pd.read_sql(text(query), conn)
         except Exception as e:
             print(f"Error en consulta filtrada de {table}: {e}")
             return pd.DataFrame()

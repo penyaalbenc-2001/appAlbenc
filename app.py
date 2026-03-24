@@ -1,4 +1,5 @@
 import threading
+import re
 from scraper import scrapear_diadia # Importamos la función nueva
 import requests
 import os
@@ -553,17 +554,17 @@ def create_home_page(cache):
         df_ev['fecha_dt'] = pd.to_datetime(df_ev['fecha'])
         proximos = df_ev[df_ev['fecha_dt'] >= pd.Timestamp.now().normalize()].sort_values('fecha_dt').head(6)
 
-    # Historial de derrames
+    # Historial de derrames (carga directa desde BD para incluir eventos pasados)
     derrames_lista = []
-    if not eventos_df.empty:
-        mask = eventos_df['evento'].str.contains('derrama', case=False, na=False)
-        derrames_df = eventos_df[mask].copy()
+    try:
+        derrames_df = dm.get_data_filtered('eventos', where_clause="LOWER(evento) LIKE '%derrama%' OR LOWER(evento) LIKE '%transferencia%'", order_by="fecha DESC")
         for _, row in derrames_df.iterrows():
-            texto = str(row['evento']) + ' ' + str(row.get('tipo', ''))
-            match = re.search(r'(\d+(?:[.,]\d+)?)\s*€', texto)
+            texto = str(row['evento'])
+            match = re.search(r'(\d+(?:[.,]\d+)?)\s*€?', texto)
             importe = match.group(1) + ' €' if match else None
-            derrames_lista.append({'fecha': row['fecha'], 'evento': row['evento'], 'importe': importe})
-        derrames_lista.sort(key=lambda x: x['fecha'], reverse=True)
+            derrames_lista.append({'fecha': row['fecha'], 'evento': texto, 'importe': importe})
+    except Exception as e:
+        print(f"Error cargando derrames: {e}")
 
     # 3. Diseño de Noticias
     items_noticias = []
