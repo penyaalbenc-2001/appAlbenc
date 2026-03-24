@@ -1,7 +1,6 @@
 import threading
 from scraper import scrapear_diadia # Importamos la función nueva
-import asyncio
-from telegram import Bot
+import requests
 import os
 from datetime import datetime
 import pandas as pd
@@ -144,27 +143,22 @@ def enviar_notificacion_telegram(mensaje):
         print("❌ ERROR: Variables de entorno no encontradas.")
         return False
 
-    async def enviar():
-        try:
-            bot = Bot(token=bot_token)
-            await bot.send_message(chat_id=chat_id, text=mensaje, parse_mode='Markdown')
-            print("✅ Telegram enviado.")
-        except Exception as e:
-            print(f"❌ Error enviando a Telegram: {e}")
-
-    # Lógica para ejecutar corrutinas desde un entorno síncrono
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(enviar())
-        loop.close()
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        response = requests.post(url, json={
+            'chat_id': chat_id,
+            'text': mensaje,
+            'parse_mode': 'Markdown'
+        }, timeout=10)
+        if response.status_code == 200:
+            print("✅ Telegram enviado.")
+            return True
+        else:
+            print(f"❌ Error enviando a Telegram: {response.text}")
+            return False
     except Exception as e:
-        # Si ya hay un loop (común en local), usamos este método
-        try:
-            asyncio.run(enviar())
-        except:
-            print("❌ No se pudo crear el loop de asyncio")
-    return True
+        print(f"❌ Error enviando a Telegram: {e}")
+        return False
 
 def enviar_resumen_mensual():
     """Genera y envía el resumen mensual por Telegram (eventos, comidas, lista compra)"""
@@ -181,76 +175,104 @@ def enviar_resumen_mensual():
         return False
 
     try:
-        # Obtener nombre del mes en catalán
         meses_catalan = ['Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny',
                          'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre']
         mes_nombre = meses_catalan[hoy.month - 1]
+        dies_catalan = ['Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte', 'Diumenge']
+
+        # Rango: hoy hasta 60 días adelante
+        fin = hoy + timedelta(days=60)
 
         mensaje = f"📆 *RESUM MENSUAL - {mes_nombre} {hoy.year}*\n"
-        mensaje += "=" * 30 + "\n\n"
+        mensaje += f"_Pròxims esdeveniments fins al {fin.strftime('%d/%m/%Y')}_\n"
+        mensaje += "━" * 28 + "\n\n"
 
-        # 1. EVENTOS del mes
-        eventos_df = dm.get_eventos_proximos(limit=50)
-        if not eventos_df.empty:
-            eventos_mes = []
-            for _, evento in eventos_df.iterrows():
-                try:
-                    fecha_evento = pd.to_datetime(evento.get('fecha', ''), dayfirst=True)
-                    if fecha_evento.month == hoy.month and fecha_evento.year == hoy.year:
-                        nombre = evento.get('nombre', 'Sense nom')
-                        fecha_str = fecha_evento.strftime('%d/%m')
-                        eventos_mes.append(f"  • {fecha_str}: {nombre}")
-                except:
-                    pass
-
-            if eventos_mes:
-                mensaje += f"🎉 *EVENTS ({len(eventos_mes)}):*\n"
-                mensaje += "\n".join(eventos_mes[:10])  # Máximo 10
-                mensaje += "\n\n"
-
-        # 2. COMIDAS del mes
-        comidas_df = dm.get_comidas_recientes(limit=50)
+        # 1. COMIDAS próximas (con todos los datos)
+        comidas_df = dm.get_comidas_recientes(limit=100)
         if not comidas_df.empty:
-            comidas_mes = []
+            comidas_proximas = []
             for _, comida in comidas_df.iterrows():
                 try:
-                    fecha_comida = pd.to_datetime(comida.get('fecha', ''), dayfirst=True)
-                    if fecha_comida.month == hoy.month and fecha_comida.year == hoy.year:
-                        # Formatear el día (ej: sant_antoni -> Sant Antoni)
+                    fecha_comida = pd.to_datetime(comida.get('fecha', '')).date()
+                    if hoy <= fecha_comida <= fin:
                         dia_raw = comida.get('dia', '')
                         dia_formateado = dia_raw.replace('_', ' ').title() if dia_raw else ''
                         tipo_comida = comida.get('tipo_comida', '')
-                        cocineros = comida.get('cocineros', comida.get('cocinero', 'Sense cuiner'))
+                        cocineros = comida.get('cocineros', comida.get('cocinero', '')) or 'Sense cuiner'
+                        dia_semana = dies_catalan[fecha_comida.weekday()]
                         fecha_str = fecha_comida.strftime('%d/%m')
 
-                        # Formato: fecha - Día (tipo): cocineros
-                        if dia_formateado and tipo_comida:
-                            comidas_mes.append(f"  • {fecha_str} - {dia_formateado} ({tipo_comida}): {cocineros}")
-                        elif dia_formateado:
-                            comidas_mes.append(f"  • {fecha_str} - {dia_formateado}: {cocineros}")
-                        else:
-                            comidas_mes.append(f"  • {fecha_str}: {cocineros}")
+                        linea = f"  📅 *{fecha_str}* ({dia_semana})"
+                        if dia_formateado:
+                            linea += f" — {dia_formateado}"
+                        if tipo_comida:
+                            linea += f"\n      🍽️ {tipo_comida}"
+                        linea += f"\n      👨‍🍳 {cocineros}"
+                        comidas_proximas.append((fecha_comida, linea))
                 except:
                     pass
 
-            if comidas_mes:
-                mensaje += f"🍳 *MENJARS ({len(comidas_mes)}):*\n"
-                mensaje += "\n".join(comidas_mes[:10])  # Máximo 10
+            comidas_proximas.sort(key=lambda x: x[0])
+            if comidas_proximas:
+                mensaje += f"🍳 *MENJARS PRÒXIMS ({len(comidas_proximas)}):*\n"
+                mensaje += "\n".join(c[1] for c in comidas_proximas[:15])
+                if len(comidas_proximas) > 15:
+                    mensaje += f"\n  _...i {len(comidas_proximas) - 15} més_"
                 mensaje += "\n\n"
 
-        # 3. LISTA DE COMPRA activa
+        # 2. EVENTOS próximos (con todos los datos)
+        eventos_df = dm.get_eventos_proximos(limit=100)
+        if not eventos_df.empty:
+            eventos_proximos = []
+            for _, evento in eventos_df.iterrows():
+                try:
+                    fecha_evento = pd.to_datetime(evento.get('fecha', '')).date()
+                    if fecha_evento <= fin:
+                        nombre = evento.get('nombre', 'Sense nom')
+                        tipo = evento.get('tipo', '') or ''
+                        dia_semana = dies_catalan[fecha_evento.weekday()]
+                        fecha_str = fecha_evento.strftime('%d/%m/%Y')
+
+                        linea = f"  📅 *{fecha_str}* ({dia_semana}) — {nombre}"
+                        if tipo:
+                            linea += f"\n      🏷️ {tipo}"
+                        eventos_proximos.append((fecha_evento, linea))
+                except:
+                    pass
+
+            eventos_proximos.sort(key=lambda x: x[0])
+            if eventos_proximos:
+                mensaje += f"🎉 *EVENTS PRÒXIMS ({len(eventos_proximos)}):*\n"
+                mensaje += "\n".join(e[1] for e in eventos_proximos[:15])
+                if len(eventos_proximos) > 15:
+                    mensaje += f"\n  _...i {len(eventos_proximos) - 15} més_"
+                mensaje += "\n\n"
+
+        # 3. LISTA DE COMPRA activa (con fechas si las hay)
         lista_df = dm.get_lista_compra_activa()
         if not lista_df.empty:
-            items = lista_df['objeto'].tolist()[:10]  # Máximo 10
-            mensaje += f"🛒 *LLISTA COMPRA ({len(lista_df)} items):*\n"
-            for item in items:
-                mensaje += f"  • {item}\n"
-            if len(lista_df) > 10:
-                mensaje += f"  _...i {len(lista_df) - 10} més_\n"
+            mensaje += f"🛒 *LLISTA DE LA COMPRA ({len(lista_df)} items):*\n"
+            for _, item in lista_df.iterrows():
+                nombre_item = item.get('objeto', item.get('nombre', ''))
+                fecha_item = item.get('fecha', item.get('fecha_prevista', ''))
+                linea = f"  • {nombre_item}"
+                if fecha_item and str(fecha_item).strip() not in ('', 'None', 'nan'):
+                    try:
+                        fecha_fmt = pd.to_datetime(fecha_item).strftime('%d/%m')
+                        linea += f" _(per al {fecha_fmt})_"
+                    except:
+                        pass
+                mensaje += linea + "\n"
+
+        if len(mensaje) < 200:
+            mensaje += "  _No hi ha res programat per als pròxims dies._\n"
 
         mensaje += "\n🤖 _Resum automàtic de Penya L'Albenc_"
 
-        # Enviar
+        # Telegram tiene límite de 4096 caracteres
+        if len(mensaje) > 4000:
+            mensaje = mensaje[:3990] + "\n\n_[Missatge retallat]_"
+
         enviar_notificacion_telegram(mensaje)
         _ultimo_resumen_mensual = hoy
         print(f"📨 Resumen mensual de {mes_nombre} enviado correctamente")
@@ -1018,9 +1040,24 @@ def marcar_reunion_eliminar(n_clicks):
     Output('store-noticias', 'data'),
     Output('store-agenda', 'data')], # <--- 11 Salidas
     Input('url', 'pathname'),
+    [State('store-comidas', 'data'),
+     State('store-eventos', 'data'),
+     State('store-fiestas', 'data'),
+     State('store-lista-compra', 'data'),
+     State('store-cambios', 'data'),
+     State('store-reuniones', 'data'),
+     State('store-mantenimiento', 'data')],
     prevent_initial_call=False
 )
-def cargar_datos_iniciales(pathname):
+def cargar_datos_iniciales(pathname, comidas_st, eventos_st, fiestas_st, lista_st, cambios_st, reuniones_st, mant_st):
+    # Si los datos ya están en sesión, no recargar la BD
+    if all(s is not None for s in [comidas_st, eventos_st, fiestas_st, lista_st, cambios_st, reuniones_st, mant_st]):
+        print("✅ Datos en sesión, saltando recarga de BD.")
+        return (dash.no_update, dash.no_update, dash.no_update, dash.no_update,
+                dash.no_update, dash.no_update, dash.no_update,
+                'loading-overlay hidden', datetime.now().timestamp(),
+                dash.no_update, dash.no_update)
+
     global _scraping_in_progress, _last_scraping_time
     print("🔄 Iniciando carga OPTIMIZADA de datos...")
 
@@ -1535,7 +1572,8 @@ def guardar_id_item(n_clicks):
     return button_id, True
 
 @app.callback(
-    Output('page-content', 'children', allow_duplicate=True),
+    [Output('page-content', 'children', allow_duplicate=True),
+     Output('store-lista-compra', 'data', allow_duplicate=True)],
     Input('confirm-eliminar-item', 'submit_n_clicks'),
     [State('store-id-eliminar-item', 'data'),
      State('url', 'pathname'),
@@ -1550,10 +1588,16 @@ def guardar_id_item(n_clicks):
 def eliminar_item_confirmado(submit, item_id, pathname, comidas, eventos, fiestas, mant, lista, cambios):
     if submit and item_id:
         lista_df_vieja = dm.get_data('lista_compra')
+        # Comparar tanto por string como por int para evitar type mismatch
         item_eliminado_fila = lista_df_vieja[lista_df_vieja['id'] == item_id]
+        if item_eliminado_fila.empty:
+            try:
+                item_eliminado_fila = lista_df_vieja[lista_df_vieja['id'] == int(item_id)]
+            except (ValueError, TypeError):
+                pass
         nombre_item_eliminado = item_eliminado_fila.iloc[0]['objeto'] if not item_eliminado_fila.empty else "un item"
         lista_df = dm.get_data('lista_compra')
-        lista_df = lista_df[lista_df['id'] != item_id]
+        lista_df = lista_df[(lista_df['id'] != item_id) & (lista_df['id'] != (int(item_id) if str(item_id).isdigit() else item_id))]
         dm.save_data('lista_compra', lista_df)
         registrar_cambio('Lista', f'Item ID {item_id} eliminado')
         lista_str = "\n\n*Llista de la compra actual:* "
@@ -1565,18 +1609,21 @@ def eliminar_item_confirmado(submit, item_id, pathname, comidas, eventos, fiesta
 
         mensaje_final = f"🛒 *Item eliminat de la compra!*\nS'ha eliminat: *{nombre_item_eliminado}*\n{lista_str}"
         enviar_notificacion_telegram(mensaje_final)
-        
+
+        lista_actualitzada = lista_df.to_dict('records')
         cache = {
             'comidas': comidas or [], 'eventos': eventos or [], 'fiestas': fiestas or [],
-            'mantenimiento': mant or [], 'lista_compra': lista_df.to_dict('records'), 'cambios': cambios or []
+            'mantenimiento': mant or [], 'lista_compra': lista_actualitzada, 'cambios': cambios or []
         }
-        return create_lista_compra_page(cache) if pathname == '/lista-compra' else dash.no_update
+        page = create_lista_compra_page(cache) if pathname == '/lista-compra' else dash.no_update
+        return page, lista_actualitzada
     raise PreventUpdate
 
 
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
-     Output('output-lista', 'children')],
+     Output('output-lista', 'children'),
+     Output('store-lista-compra', 'data', allow_duplicate=True)],
     Input('btn-agregar-lista', 'n_clicks'),
     [State('lista-nueva-fecha', 'date'),
      State('lista-nuevo-objeto', 'value'),
@@ -1592,34 +1639,33 @@ def eliminar_item_confirmado(submit, item_id, pathname, comidas, eventos, fiesta
 def agregar_item_lista(n_clicks, fecha, objeto, pathname, comidas, eventos, fiestas, mant, lista, cambios):
     if not n_clicks or not objeto:
         raise PreventUpdate
-    
+
     dm.add_data('lista_compra', (fecha, objeto))
     registrar_cambio('Lista Compra', f'Item añadido: {objeto}')
-    
-    # --- INICIO DE LA CORRECCIÓN ---
-    # Obtenemos los datos y los guardamos en 'lista_df'
+
     lista_df = dm.get_data('lista_compra')
-    
-    # Formateamos el mensaje para Telegram
+
     lista_str = "\n\n*Llista de la compra actual:* "
     if not lista_df.empty:
-        # Usamos enumerate para tener un índice numérico
         for i, row in lista_df.iterrows():
             lista_str += f"\n{i+1}. {row['objeto']}"
     else:
         lista_str += "\nLa llista està buida."
-    
+
     mensaje_final = f"🛒 *Nou item a la compra!*\nS'ha afegit: *{objeto}*\n{lista_str}"
     enviar_notificacion_telegram(mensaje_final)
-    
-    # Ahora, cuando usamos 'lista_df' aquí, la variable SÍ existe
+
+    lista_actualitzada = lista_df.to_dict('records')
     cache = {
         'comidas': comidas or [], 'eventos': eventos or [], 'fiestas': fiestas or [],
-        'mantenimiento': mant or [], 'lista_compra': lista_df.to_dict('records'), 'cambios': cambios or []
+        'mantenimiento': mant or [], 'lista_compra': lista_actualitzada, 'cambios': cambios or []
     }
-    # --- FIN DE LA CORRECCIÓN ---
-    
-    return create_lista_compra_page(cache) if pathname == '/lista-compra' else dash.no_update, dbc.Alert(f"✅ '{objeto}' añadido", color="success", duration=3000)
+
+    return (
+        create_lista_compra_page(cache) if pathname == '/lista-compra' else dash.no_update,
+        dbc.Alert(f"✅ '{objeto}' añadido", color="success", duration=3000),
+        lista_actualitzada
+    )
 
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
@@ -1937,10 +1983,15 @@ def actualizar_lista_comidas(año):
                 html.Div([
                     html.H6(f"{row['dia'].replace('_', ' ').title()}", className="mb-1 fw-bold"),
                     html.P(f"Fecha: {row['fecha']}", className="mb-1 text-muted small"),
+                    html.P(f"Tipo: {row.get('tipo_comida', '')}", className="mb-0 small text-muted"),
                     html.P(f"Cocineros: {row['cocineros']}", className="mb-0 small"),
                 ]),
-                dbc.Button("✕", id={'type': 'btn-eliminar-comida', 'index': row['id']}, 
-                         color="danger", size="sm", outline=True)
+                html.Div([
+                    dbc.Button("✏️", id={'type': 'btn-editar-comida', 'index': row['id']},
+                             color="primary", size="sm", outline=True, className="me-1"),
+                    dbc.Button("✕", id={'type': 'btn-eliminar-comida', 'index': row['id']},
+                             color="danger", size="sm", outline=True)
+                ])
             ])
         ], action=True) for _, row in comidas_año.iterrows()
     ], flush=True)
@@ -2030,7 +2081,8 @@ def abrir_modal_editar_item(n_editar, n_cancelar, lista):
 # Callback para guardar la edición
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
-     Output('modal-editar-item', 'is_open', allow_duplicate=True)],
+     Output('modal-editar-item', 'is_open', allow_duplicate=True),
+     Output('store-lista-compra', 'data', allow_duplicate=True)],
     Input('btn-guardar-edicion-item', 'n_clicks'),
     [State('store-id-editar-item', 'data'),
      State('editar-item-objeto', 'value'),
@@ -2041,45 +2093,45 @@ def abrir_modal_editar_item(n_editar, n_cancelar, lista):
      State('store-fiestas', 'data'),
      State('store-mantenimiento', 'data'),
      State('store-cambios', 'data'),
-     State('store-noticias', 'data'), # <--- Importante mantenerlos en el cache
-     State('store-agenda', 'data')],   # <--- Importante mantenerlos en el cache
+     State('store-noticias', 'data'),
+     State('store-agenda', 'data')],
     prevent_initial_call=True
 )
 def guardar_edicion_item(n_clicks, item_id, nuevo_objeto, nueva_fecha, lista, comidas, eventos, fiestas, mant, cambios, noticias, agenda):
     if not n_clicks or not item_id:
         raise PreventUpdate
-    
-    # 1. Actualizar en base de datos
+
     lista_df = dm.get_data('lista_compra')
     idx = lista_df.index[lista_df['id'] == item_id].tolist()
-    
+    if not idx:
+        try:
+            idx = lista_df.index[lista_df['id'] == int(item_id)].tolist()
+        except (ValueError, TypeError):
+            pass
+
     if idx:
         lista_df.loc[idx[0], 'objeto'] = nuevo_objeto
         lista_df.loc[idx[0], 'fecha'] = nueva_fecha
         dm.save_data('lista_compra', lista_df)
-        
-        # 2. Registro histórico interno
         registrar_cambio('Lista', f'Item editado: {nuevo_objeto}')
-        
-        # 3. Notificación única a Telegram
         mensaje_telegram = f"🛒 *Llista de la compra modificada*\nS'ha editat l'item: *{nuevo_objeto}*\nNova data prevista: {nueva_fecha}"
         enviar_notificacion_telegram(mensaje_telegram)
-    
-    # 4. Reconstruir el objeto cache para la función de la página
-    # Esto evita que los componentes pierdan datos al refrescar la vista
+    else:
+        print(f"❌ guardar_edicion_item: no se encontró item_id={item_id} en BD")
+
+    lista_actualitzada = lista_df.to_dict('records')
     cache_actualizado = {
         'comidas': comidas or [],
         'eventos': eventos or [],
         'fiestas': fiestas or [],
         'mantenimiento': mant or [],
-        'lista_compra': lista_df.to_dict('records'),
+        'lista_compra': lista_actualitzada,
         'cambios': cambios or [],
         'noticias': noticias or [],
         'agenda': agenda or []
     }
-    
-    # 5. Retornar la página de lista de compra actualizada y cerrar el modal
-    return create_lista_compra_page(cache_actualizado), False
+
+    return create_lista_compra_page(cache_actualizado), False, lista_actualitzada
 
 # Callback para abrir modal de editar evento
 @app.callback(
@@ -2164,6 +2216,114 @@ def guardar_edicion_evento(n_clicks, evento_id, nuevo_nombre, nuevo_tipo, nueva_
     }
     return create_eventos_page(cache), False
     
+# Callback para abrir modal de editar comida
+@app.callback(
+    [Output('modal-editar-comida', 'is_open'),
+     Output('editar-comida-dia', 'value'),
+     Output('editar-comida-tipo', 'value'),
+     Output('editar-comida-fecha', 'date'),
+     Output('editar-comida-cocineros', 'value'),
+     Output('store-id-editar-comida', 'data')],
+    [Input({'type': 'btn-editar-comida', 'index': ALL}, 'n_clicks'),
+     Input('btn-cancelar-edicion-comida', 'n_clicks')],
+    State('store-comidas', 'data'),
+    prevent_initial_call=True
+)
+def abrir_modal_editar_comida(n_editar, n_cancelar, comidas_data):
+    ctx = callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    trigger = ctx.triggered_id
+
+    if trigger == 'btn-cancelar-edicion-comida':
+        return False, "", "", None, "", None
+
+    if isinstance(trigger, dict) and trigger['type'] == 'btn-editar-comida':
+        if not any(n_editar):
+            raise PreventUpdate
+
+        comida_id = trigger['index']
+
+        # Buscar primero en el store (sin llamada a BD)
+        comida = pd.DataFrame()
+        if comidas_data:
+            df_store = pd.DataFrame(comidas_data)
+            if not df_store.empty and 'id' in df_store.columns:
+                comida = df_store[df_store['id'] == comida_id]
+
+        # Fallback a BD si no estaba en el store
+        if comida.empty:
+            comidas_df = dm.get_data('comidas')
+            comida = comidas_df[comidas_df['id'] == comida_id]
+
+        if not comida.empty:
+            row = comida.iloc[0]
+            return True, row['dia'], row.get('tipo_comida', ''), row['fecha'], row['cocineros'], comida_id
+
+    raise PreventUpdate
+
+
+# Callback para guardar la edición de comida
+@app.callback(
+    [Output('page-content', 'children', allow_duplicate=True),
+     Output('modal-editar-comida', 'is_open', allow_duplicate=True),
+     Output('store-comidas', 'data', allow_duplicate=True)],
+    Input('btn-guardar-edicion-comida', 'n_clicks'),
+    [State('store-id-editar-comida', 'data'),
+     State('editar-comida-dia', 'value'),
+     State('editar-comida-tipo', 'value'),
+     State('editar-comida-fecha', 'date'),
+     State('editar-comida-cocineros', 'value'),
+     State('store-comidas', 'data'),
+     State('store-eventos', 'data'),
+     State('store-fiestas', 'data'),
+     State('store-mantenimiento', 'data'),
+     State('store-lista-compra', 'data'),
+     State('store-cambios', 'data')],
+    prevent_initial_call=True
+)
+def guardar_edicion_comida(n_clicks, comida_id, nuevo_dia, nuevo_tipo, nueva_fecha, nuevos_cocineros,
+                           comidas, eventos, fiestas, mant, lista, cambios):
+    if not n_clicks or not comida_id:
+        raise PreventUpdate
+
+    comidas_df = dm.get_data('comidas')
+    # Intentar coincidir por tipo int o string
+    idx = comidas_df.index[comidas_df['id'] == comida_id].tolist()
+    if not idx:
+        try:
+            idx = comidas_df.index[comidas_df['id'] == int(comida_id)].tolist()
+        except (ValueError, TypeError):
+            pass
+
+    if idx:
+        comidas_df.loc[idx[0], 'dia'] = nuevo_dia or ''
+        comidas_df.loc[idx[0], 'tipo_comida'] = nuevo_tipo or ''
+        comidas_df.loc[idx[0], 'fecha'] = nueva_fecha or ''
+        comidas_df.loc[idx[0], 'cocineros'] = nuevos_cocineros or ''
+        dm.save_data('comidas', comidas_df)
+
+        registrar_cambio('Comidas', f'Comida editada: {nuevo_dia} ({nueva_fecha})')
+        dia_formateado = nuevo_dia.replace('_', ' ').title() if nuevo_dia else nuevo_dia
+        enviar_notificacion_telegram(
+            f"✏️ *Menjar editat:* {dia_formateado}\nData: {nueva_fecha}\nCuiners: {nuevos_cocineros}"
+        )
+    else:
+        print(f"❌ guardar_edicion_comida: no se encontró comida_id={comida_id} en BD")
+
+    comidas_actualitzades = comidas_df.to_dict('records')
+    cache = {
+        'comidas': comidas_actualitzades,
+        'eventos': eventos or [],
+        'fiestas': fiestas or [],
+        'mantenimiento': mant or [],
+        'lista_compra': lista or [],
+        'cambios': cambios or []
+    }
+    return create_comidas_page(cache), False, comidas_actualitzades
+
+
 @app.callback(
     Output("menu-dropdown", "style", allow_duplicate=True),
     Input('url', 'pathname'),
@@ -2172,6 +2332,7 @@ def guardar_edicion_evento(n_clicks, evento_id, nuevo_nombre, nuevo_tipo, nueva_
 def cerrar_menu_al_navegar(pathname):
     """Cerrar el menú automáticamente cuando se navega a una nueva página"""
     return {"display": "none"}
+
 
 @app.callback(
     [Output('store-comensales-adultos', 'data', allow_duplicate=True), Output('store-comensales-niños', 'data', allow_duplicate=True),
@@ -2328,6 +2489,27 @@ dbc.Modal([
 
 dcc.Store(id='store-id-editar-evento', data=None),
 
+# Modal para editar comida
+dbc.Modal([
+    dbc.ModalHeader(dbc.ModalTitle("✏️ Editar Comida")),
+    dbc.ModalBody([
+        html.Label("Día (nombre):", className="fw-bold"),
+        dbc.Input(id='editar-comida-dia', placeholder="Ej: Sant Antoni", className="mb-2"),
+        html.Label("Tipo de comida:", className="fw-bold"),
+        dbc.Input(id='editar-comida-tipo', placeholder="Ej: Dinar, Sopar...", className="mb-2"),
+        html.Label("Fecha:", className="fw-bold"),
+        dcc.DatePickerSingle(id='editar-comida-fecha', className="mb-2 d-block"),
+        html.Label("Cocineros:", className="fw-bold"),
+        dbc.Input(id='editar-comida-cocineros', placeholder="Nombres separados por coma"),
+    ]),
+    dbc.ModalFooter([
+        dbc.Button("Guardar", id='btn-guardar-edicion-comida', color="success"),
+        dbc.Button("Cancelar", id='btn-cancelar-edicion-comida', color="secondary")
+    ])
+], id='modal-editar-comida', is_open=False),
+
+dcc.Store(id='store-id-editar-comida', data=None),
+
 # --- NUEVA ESTRUCTURA VISUAL ---
     create_modern_navbar(),
 
@@ -2342,7 +2524,12 @@ dcc.Store(id='store-id-editar-evento', data=None),
         },
         children=[
             # El contenido de cada página se cargará aquí dentro
-            html.Div(id='page-content')
+            dcc.Loading(
+                id="loading-page-content",
+                type="circle",
+                color="#667eea",
+                children=html.Div(id='page-content')
+            )
         ]
     )
 ])
