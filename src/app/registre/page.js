@@ -62,7 +62,16 @@ export default function Registre() {
       // Assign the member in the DB
       try {
         await assignarMembre(parseInt(selectedMembreId), data.user.id);
-        // Ensure UI stops loading just in case redirect takes time
+
+        if (!data.session) {
+          // Email confirmation required by Supabase: there's no session yet,
+          // so entering the app now would just bounce back to /login.
+          setRegistering(false);
+          setError(null);
+          router.push('/login?confirmar=1');
+          return;
+        }
+
         setRegistering(false);
         router.push('/');
         router.refresh();
