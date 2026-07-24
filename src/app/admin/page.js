@@ -42,10 +42,10 @@ export default function AdminPage() {
         </p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button className="btn-primary" style={{ background: 'var(--primary-blue-dark)' }} onClick={() => alert('Pròximament: Editor SQL / Gestor de membres')}>
+          <Link href="/admin/usuaris" className="btn-primary" style={{ background: 'var(--primary-blue-dark)', display: 'block', textAlign: 'center' }}>
             👥 Gestionar Membres
-          </button>
-          <button className="btn-primary" style={{ background: '#ef4444' }} onClick={() => alert('Pròximament: Esborrat massiu d\'activitat')}>
+          </Link>
+          <button className="btn-primary" style={{ background: '#ef4444' }} onClick={() => alert("Pròximament: Esborrat massiu d'activitat")}>
             🗑️ Netejar Historial d'Activitat
           </button>
         </div>
