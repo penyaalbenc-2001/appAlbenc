@@ -1,0 +1,21 @@
+{
+  "name": "Penya l'Albenc",
+  "short_name": "Albenc",
+  "description": "Aplicació web per a la gestió de la Penya l'Albenc",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e0f2fe",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/icon.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/icon.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
