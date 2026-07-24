@@ -52,8 +52,22 @@ export default function LlistaCompraPage() {
 
   const handleDelete = async (id) => {
     if (!confirm('Segur que vols eliminar aquest producte?')) return;
+    const itemToDelete = items.find(i => i.id === id);
     setItems(items.filter(i => i.id !== id));
-    await deleteCompraItem(id);
+    
+    try {
+      if (itemToDelete) {
+        await deleteCompraItem(id, itemToDelete.objeto, membreNom);
+      } else {
+        await deleteCompraItem(id, 'un producte', membreNom);
+      }
+    } catch (error) {
+      console.error("Failed to delete item", error);
+      alert("Error eliminant el producte");
+      // Revertir canvi si falla
+      const refreshedData = await getCompraItems();
+      setItems(refreshedData);
+    }
   };
 
   if (loading) return <div className="container" style={{marginTop: '50px', textAlign: 'center'}}>Carregant llista...</div>;

@@ -13,6 +13,7 @@ export default function Registre() {
   const [membres, setMembres] = useState([]);
   const [selectedMembreId, setSelectedMembreId] = useState('');
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const router = useRouter();
@@ -63,18 +64,18 @@ export default function Registre() {
       try {
         await assignarMembre(parseInt(selectedMembreId), data.user.id);
 
-        if (!data.session) {
-          // Email confirmation required by Supabase: there's no session yet,
-          // so entering the app now would just bounce back to /login.
-          setRegistering(false);
-          setError(null);
-          router.push('/login?confirmar=1');
-          return;
-        }
-
+        setSuccess(true);
         setRegistering(false);
-        router.push('/');
-        router.refresh();
+
+        setTimeout(() => {
+          if (!data.session) {
+            // Email confirmation required by Supabase
+            router.push('/login?confirmar=1');
+          } else {
+            router.push('/');
+            router.refresh();
+          }
+        }, 2000);
       } catch (dbError) {
         setError("L'usuari s'ha creat, però hi ha hagut un error assignant el membre: " + dbError.message);
         setRegistering(false);
@@ -91,74 +92,85 @@ export default function Registre() {
     <div className="container" style={{ marginTop: '50px', marginBottom: '100px' }}>
       <h1 className="title" style={{ textAlign: 'center' }}>Crea el teu compte</h1>
       <div className="card">
-        <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {error && <div style={{ color: 'red', fontSize: '0.9rem' }}>{error}</div>}
-          
-          <div>
-            <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Qui eres?</label>
-            <select 
-              value={selectedMembreId} 
-              onChange={(e) => setSelectedMembreId(e.target.value)}
-              required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white' }}
-            >
-              <option value="" disabled>Selecciona el teu nom</option>
-              {membres.map(m => (
-                <option key={m.id} value={m.id}>{m.nom}</option>
-              ))}
-            </select>
-            <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Només es mostren els membres que encara no tenen compte.</small>
+        {success ? (
+          <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '15px' }}>✅</div>
+            <h2 style={{ color: 'var(--primary-blue)', marginBottom: '15px' }}>Registrat correctament!</h2>
+            <p style={{ color: 'var(--text-muted)' }}>Redirigint a la pàgina d'inici...</p>
           </div>
-
-          <div>
-            <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Correu Electrònic</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-            />
-          </div>
-          
-          <div>
-            <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Contrasenya</label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showPassword ? "text" : "password"} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-                minLength={6}
-                style={{ width: '100%', padding: '12px', paddingRight: '45px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  padding: '5px'
-                }}
+        ) : (
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {error && <div style={{ color: 'red', fontSize: '0.9rem' }}>{error}</div>}
+            
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Qui eres?</label>
+              <select 
+                value={selectedMembreId} 
+                onChange={(e) => setSelectedMembreId(e.target.value)}
+                required
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white' }}
               >
-                {showPassword ? '🙈' : '👁️'}
-              </button>
+                <option value="" disabled>Selecciona el teu nom</option>
+                {membres.map(m => (
+                  <option key={m.id} value={m.id}>{m.nom}</option>
+                ))}
+              </select>
+              <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Només es mostren els membres que encara no tenen compte.</small>
             </div>
-          </div>
 
-          <button type="submit" className="btn-primary" disabled={registering} style={{ marginTop: '10px' }}>
-            {registering ? 'Registrant...' : 'Registrar-se'}
-          </button>
-        </form>
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem' }}>
-          Ja tens compte? <Link href="/login" style={{ color: 'var(--primary-blue)', fontWeight: '600' }}>Inicia sessió</Link>
-        </p>
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Correu Electrònic</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required 
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+            
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Contrasenya</label>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                  minLength={6}
+                  style={{ width: '100%', padding: '12px', paddingRight: '45px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem',
+                    padding: '5px'
+                  }}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="btn-primary" disabled={registering} style={{ marginTop: '10px' }}>
+              {registering ? 'Registrant...' : 'Registrar-se'}
+            </button>
+          </form>
+        )}
+        
+        {!success && (
+          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem' }}>
+            Ja tens compte? <Link href="/login" style={{ color: 'var(--primary-blue)', fontWeight: '600' }}>Inicia sessió</Link>
+          </p>
+        )}
       </div>
       
       {/* Logo a la part inferior */}

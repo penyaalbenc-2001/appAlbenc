@@ -39,6 +39,21 @@ export async function toggleCompraItem(id, estadoActual, objeto, usuario) {
   }
 }
 
-export async function deleteCompraItem(id) {
-  await db.query("DELETE FROM lista_compra WHERE id = $1", [id]);
+export async function deleteCompraItem(id, objeto, usuario) {
+  try {
+    await db.query("DELETE FROM lista_compra WHERE id = $1", [id]);
+    
+    // Registrar activitat
+    if (usuario && objeto) {
+      await registrarActivitat(
+        usuario,
+        'Llista de la compra',
+        `ha eliminat: ${objeto}.`,
+        `🗑️ <b>Llista de la compra</b>\n\n${usuario} ha eliminat: ${objeto}.`
+      );
+    }
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    throw error;
+  }
 }
