@@ -1,6 +1,11 @@
 import Navigation from '@/components/Navigation';
 import './globals.css';
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata = {
   title: "Penya l'Albenc",
   description: "Gestió i activitats de la Penya l'Albenc",

@@ -14,7 +14,12 @@ export async function saveReunion(id, fecha, temas, asistentes, estado, usuario)
       'UPDATE reuniones SET fecha = $1, temas = $2, asistentes = $3, estado = $4 WHERE id = $5 RETURNING *',
       [fecha, temas, asistentes, estado, id]
     );
-    await registrarActivitat(usuario, 'Reuniones', `ha modificat l'acta de la reunió del dia ${fecha}`);
+    await registrarActivitat(
+      usuario,
+      'Reuniones',
+      `ha modificat l'acta de la reunió del dia ${fecha}`,
+      `📝 <b>Acta de Reunió modificada</b>\n\n${usuario} ha modificat l'acta de la reunió del dia ${fecha}.`
+    );
     return rows[0];
   } else {
     const { rows } = await db.query(
@@ -33,5 +38,10 @@ export async function saveReunion(id, fecha, temas, asistentes, estado, usuario)
 
 export async function deleteReunion(id, usuario) {
   await db.query('DELETE FROM reuniones WHERE id = $1', [id]);
-  await registrarActivitat(usuario, 'Reuniones', 'ha eliminat una acta de reunió');
+  await registrarActivitat(
+    usuario,
+    'Reuniones',
+    'ha eliminat una acta de reunió',
+    `🗑️ <b>Acta de Reunió eliminada</b>\n\n${usuario} ha eliminat una acta de reunió.`
+  );
 }

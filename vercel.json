@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/noticias",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/resumen-mensual",
+      "schedule": "0 10 1 * *"
+    },
+    {
+      "path": "/api/cron/festes-avis",
+      "schedule": "0 10 * * *"
     }
   ]
 }

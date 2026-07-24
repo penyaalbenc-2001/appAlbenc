@@ -26,7 +26,12 @@ export async function addEsdeveniment(evento, fecha, fecha_fin, hora, ubicacion,
 
 export async function deleteEsdeveniment(id, evento, usuario) {
   await db.query("DELETE FROM eventos WHERE id = $1", [id]);
-  await registrarActivitat(usuario, 'Esdeveniments', `ha eliminat l'esdeveniment "${evento}".`);
+  await registrarActivitat(
+    usuario,
+    'Esdeveniments',
+    `ha eliminat l'esdeveniment "${evento}".`,
+    `🗑️ <b>Esdeveniment eliminat</b>\n\n${usuario} ha eliminat "${evento}".`
+  );
 }
 
 export async function getAllCalendarEvents() {

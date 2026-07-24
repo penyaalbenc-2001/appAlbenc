@@ -40,5 +40,10 @@ export async function addCompte(concepte, importValor, tipus, data, usuari, adju
 
 export async function deleteCompte(id, concepte, usuari) {
   await db.query("DELETE FROM comptes WHERE id = $1", [id]);
-  await registrarActivitat(usuari, 'Comptes', `ha eliminat l'apunt "${concepte}".`);
+  await registrarActivitat(
+    usuari,
+    'Comptes',
+    `ha eliminat l'apunt "${concepte}".`,
+    `🗑️ <b>Apunt eliminat</b>\n\n${usuari} ha eliminat l'apunt "${concepte}".`
+  );
 }

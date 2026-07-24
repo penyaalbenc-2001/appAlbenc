@@ -33,7 +33,7 @@ export default function Login() {
   };
 
   return (
-    <div className="container" style={{ marginTop: '50px' }}>
+    <div className="container" style={{ marginTop: 'clamp(20px, 8vw, 50px)' }}>
       <h1 className="title" style={{ textAlign: 'center' }}>Inicia Sessió</h1>
       <div className="card">
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -92,7 +92,7 @@ export default function Login() {
           src="/icon.jpeg" 
           alt="Logo Penya l'Albenc" 
           style={{ 
-            height: '500px', 
+            height: '150px', 
             width: 'auto', 
             maxWidth: '100%',
             borderRadius: '24px', 

@@ -12,7 +12,8 @@ async function getDashboardData() {
     esdeveniment: null,
     manteniment: null,
     noticies: [],
-    activitat: []
+    activitat: [],
+    compra: []
   };
 
   try {
@@ -74,8 +75,12 @@ async function getDashboardData() {
     data.noticies = noticies;
 
     // E. Activitat recent
-    const { rows: activitat } = await db.query('SELECT * FROM cambios ORDER BY id DESC LIMIT 3');
+    const { rows: activitat } = await db.query("SELECT * FROM cambios WHERE usuario != 'Anónimo' ORDER BY id DESC LIMIT 5");
     data.activitat = activitat;
+
+    // F. Llista de la compra pendent
+    const { rows: compra } = await db.query("SELECT * FROM lista_compra WHERE estado = 'pendent' ORDER BY id DESC LIMIT 5");
+    data.compra = compra;
 
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
@@ -181,7 +186,7 @@ export default async function Dashboard() {
         {(!data.proxims || data.proxims.length === 0) ? (
           <div className="card"><p style={{ color: 'var(--text-muted)' }}>No hi ha res programat pròximament.</p></div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {data.proxims.map((item, i) => {
               // Format de data DD-MM-YYYY
               let formattedDate = item.fecha || 'Sense data';
@@ -206,7 +211,7 @@ export default async function Dashboard() {
                   .replace(/ y /gi, ' i ');
 
                 return (
-                  <Link key={`comida-${item.id || i}`} href="/menjades" className="card" style={{ display: 'block', borderLeft: '4px solid var(--primary-green)', textDecoration: 'none', padding: '6px 10px', borderRadius: '8px' }}>
+                  <Link key={`comida-${item.id || i}`} href="/menjades" className="card" style={{ display: 'block', borderLeft: '4px solid var(--primary-green)', textDecoration: 'none', padding: '6px 10px', borderRadius: '8px', marginBottom: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                         🍽️ 
@@ -223,7 +228,7 @@ export default async function Dashboard() {
                 );
               } else {
                 return (
-                  <Link key={`evento-${item.id || i}`} href="/agenda" className="card" style={{ display: 'block', borderLeft: '4px solid var(--primary-blue)', textDecoration: 'none', padding: '6px 10px', borderRadius: '8px' }}>
+                  <Link key={`evento-${item.id || i}`} href="/agenda" className="card" style={{ display: 'block', borderLeft: '4px solid var(--primary-blue)', textDecoration: 'none', padding: '6px 10px', borderRadius: '8px', marginBottom: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h4 style={{ fontSize: '1rem', margin: 0 }}>📅 {item.evento}</h4>
                       {item.hora && <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>a les {item.hora}</span>}
@@ -263,24 +268,50 @@ export default async function Dashboard() {
         )}
       </section>
 
-      {/* 5. Activitat Recent */}
-      <section style={{ marginBottom: '25px' }}>
-        <h3 style={{ fontSize: '1.3rem', color: 'var(--text-main)', marginBottom: '10px' }}>🕐 Últims canvis</h3>
-        <div className="card" style={{ padding: '15px' }}>
-          {data.activitat.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No hi ha activitat recent.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {data.activitat.map((a, i) => (
-                <li key={a.id || i} style={{ display: 'flex', flexDirection: 'column', gap: '3px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.95rem' }}><strong>{a.usuario || 'Algú'}</strong> {a.descripcion}</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{a.fecha}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      {/* 5 & 6. Activitat Recent i Llista de la compra */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+        <section>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>🕐 Últims canvis</h3>
+          </div>
+          <div className="card" style={{ padding: '15px', height: '100%', marginBottom: 0 }}>
+            {data.activitat.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>No hi ha activitat recent.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {data.activitat.map((a, i) => (
+                  <li key={a.id || i} style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '0.9rem' }}><strong>{a.usuario || 'Algú'}</strong> {a.descripcion}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.fecha}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>🛒 Llista de la compra</h3>
+            <Link href="/compra" style={{ fontSize: '0.9rem', color: 'var(--primary-blue)', fontWeight: '600' }}>Vore llista completa</Link>
+          </div>
+          <div className="card" style={{ padding: '15px', height: '100%', marginBottom: 0 }}>
+            {data.compra.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>No hi ha res pendent de comprar.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {data.compra.map((c, i) => (
+                  <li key={c.id || i} style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                    <span style={{ width: '20px', height: '20px', border: '2px solid var(--primary-orange)', borderRadius: '4px', display: 'inline-block', flexShrink: 0 }}></span>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', flex: 1 }}>{c.objeto}</span>
+                    <span className="badge badge-orange">{c.cantidad}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
 
       {/* 6. Accessos Ràpids */}
       <section style={{ marginBottom: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>

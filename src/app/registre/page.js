@@ -53,9 +53,17 @@ export default function Registre() {
     }
 
     if (data?.user) {
+      if (data.user?.identities && data.user.identities.length === 0) {
+        setError("Aquest correu ja existeix a la base de dades. Si no recordes la contrasenya, demana un restabliment o usa un altre correu.");
+        setRegistering(false);
+        return;
+      }
+
       // Assign the member in the DB
       try {
         await assignarMembre(parseInt(selectedMembreId), data.user.id);
+        // Ensure UI stops loading just in case redirect takes time
+        setRegistering(false);
         router.push('/');
         router.refresh();
       } catch (dbError) {
@@ -150,7 +158,7 @@ export default function Registre() {
           src="/icon.jpeg" 
           alt="Logo Penya l'Albenc" 
           style={{ 
-            height: '500px', 
+            height: '150px', 
             width: 'auto', 
             maxWidth: '100%',
             borderRadius: '24px', 

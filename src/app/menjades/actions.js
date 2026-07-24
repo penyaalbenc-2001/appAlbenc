@@ -77,5 +77,10 @@ export async function executeAddRemove(mealId, newCocineros, mealFecha, usuario,
 
 export async function deleteMenjada(id, usuario) {
   await db.query("DELETE FROM comidas WHERE id = $1", [id]);
-  await registrarActivitat(usuario, 'Menjades', 'ha eliminat una menjada.');
+  await registrarActivitat(
+    usuario,
+    'Menjades',
+    'ha eliminat una menjada.',
+    `🗑️ <b>Menjada eliminada</b>\n\n${usuario} ha eliminat una menjada.`
+  );
 }
