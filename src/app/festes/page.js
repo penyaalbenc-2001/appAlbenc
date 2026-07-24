@@ -1,9 +1,9 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getDiesFestesAmbDades, updateMenuFesta, updateComensalsFesta } from './actions';
+import { getDiesFestesAmbDades, updateMenuFesta, updateFestesCooks } from './actions';
+import { getRespostes } from './respostes/actions';
 import Link from 'next/link';
 
 const programacion2026 = {
@@ -61,14 +61,15 @@ const programacion2026 = {
   ]
 };
 
-function DiaFestaCard({ dia, programacion, userName, isDiaPenyes, onUpdate }) {
+function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooksArray, isDiaPenyes, onUpdate }) {
   const [editingMenu, setEditingMenu] = useState(false);
   const [menuText, setMenuText] = useState(dia.informacion || '');
   const [savingMenu, setSavingMenu] = useState(false);
 
-  const [editingComensals, setEditingComensals] = useState(false);
-  const [comensalsText, setComensalsText] = useState(dia.participantes || '');
-  const [savingComensals, setSavingComensals] = useState(false);
+  const initialCooks = dia.cocineros ? dia.cocineros.split(/[,i]+/).map(c => c.trim()).filter(Boolean) : [];
+  const [savingCooks, setSavingCooks] = useState(false);
+  const [addingCook, setAddingCook] = useState(false);
+  const [newCookName, setNewCookName] = useState('');
 
   const dayOfWeek = (dateStr) => {
     const d = new Date(dateStr);
@@ -85,11 +86,24 @@ function DiaFestaCard({ dia, programacion, userName, isDiaPenyes, onUpdate }) {
     onUpdate();
   };
 
-  const handleSaveComensals = async () => {
-    setSavingComensals(true);
-    await updateComensalsFesta(dia.id, comensalsText, userName);
-    setEditingComensals(false);
-    setSavingComensals(false);
+  const handleRemoveCook = async (cookToRemove) => {
+    setSavingCooks(true);
+    const updatedCooks = initialCooks.filter(c => c !== cookToRemove);
+    const newCooksString = updatedCooks.join(', ').replace(/, ([^,]*)$/, ' i $1');
+    await updateFestesCooks(dia.id, newCooksString, dia.cocineros, userName);
+    setSavingCooks(false);
+    onUpdate();
+  };
+
+  const handleAddCook = async () => {
+    if (!newCookName.trim()) return;
+    setSavingCooks(true);
+    const updatedCooks = [...initialCooks, newCookName.trim()];
+    const newCooksString = updatedCooks.join(', ').replace(/, ([^,]*)$/, ' i $1');
+    await updateFestesCooks(dia.id, newCooksString, dia.cocineros, userName);
+    setNewCookName('');
+    setAddingCook(false);
+    setSavingCooks(false);
     onUpdate();
   };
 
@@ -116,17 +130,87 @@ function DiaFestaCard({ dia, programacion, userName, isDiaPenyes, onUpdate }) {
       <div style={{ padding: '20px', backgroundColor: isDiaPenyes ? '#fef2f2' : 'white', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Cuiners assignats */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>🧑‍🍳 Cuiners</h3>
-            <Link href={`/menjades/editor?id=${dia.id}`} style={{ fontSize: '12px', color: 'var(--primary-blue)', textDecoration: 'underline' }}>
-              Editar
-            </Link>
+        {!isDiaPenyes && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>🧑‍🍳 Cuiners</h3>
+              {!addingCook && (
+                <button onClick={() => setAddingCook(true)} style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--primary-blue)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                  + Afegir
+                </button>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '32px' }}>
+              {initialCooks.length === 0 ? (
+                <span style={{ color: '#94a3b8', fontSize: '14px' }}>Sense assignar</span>
+              ) : (
+                initialCooks.map((cook, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--primary-blue-light)', color: 'var(--primary-blue-dark)', padding: '4px 10px', borderRadius: '16px', fontSize: '13px', fontWeight: '500' }}>
+                    {cook}
+                    <button 
+                      onClick={() => handleRemoveCook(cook)} 
+                      disabled={savingCooks}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--primary-blue-dark)', cursor: savingCooks ? 'wait' : 'pointer', padding: 0, display: 'flex', alignItems: 'center', opacity: 0.7 }}
+                      title="Eliminar cuiner"
+                    >
+                      ✖
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {addingCook && (
+              <div style={{ marginTop: '10px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <select 
+                  value={newCookName} 
+                  onChange={(e) => setNewCookName(e.target.value)} 
+                  style={{ padding: '8px', borderRadius: '6px', border: '1px solid #94a3b8', width: '100%', fontSize: '14px' }}
+                >
+                  <option value="">-- Tria de la llista de voluntaris --</option>
+                  {(() => {
+                    const availableCooksForThisDay = respostes.filter(r => {
+                      try {
+                        const diesCuinar = typeof r.dies_cuinar === 'string' ? JSON.parse(r.dies_cuinar) : (r.dies_cuinar || []);
+                        return diesCuinar.includes(dia.fecha);
+                      } catch(e) { return false; }
+                    });
+                    
+                    const availableNotAssignedToday = availableCooksForThisDay.filter(r => !initialCooks.includes(r.nom_cognoms));
+                    
+                    if (availableNotAssignedToday.length === 0) {
+                      return <option disabled>Cap voluntari disponible hui</option>;
+                    }
+
+                    return availableNotAssignedToday.map(r => {
+                      const isAlreadyCookingOtherDay = allAssignedCooksArray.includes(r.nom_cognoms);
+                      return (
+                        <option key={r.id} value={r.nom_cognoms} disabled={isAlreadyCookingOtherDay}>
+                          {r.nom_cognoms} {isAlreadyCookingOtherDay ? '(Ja cuina un altre dia)' : ''}
+                        </option>
+                      );
+                    });
+                  })()}
+                </select>
+                <div style={{ textAlign: 'center', fontSize: '12px', color: '#64748b' }}>o escriu un nom manual:</div>
+                <input 
+                  type="text" 
+                  value={newCookName} 
+                  onChange={(e) => setNewCookName(e.target.value)} 
+                  placeholder="Nom del cuiner..."
+                  style={{ padding: '8px', borderRadius: '6px', border: '1px solid #94a3b8', width: '100%', fontSize: '14px' }}
+                />
+                <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
+                  <button onClick={handleAddCook} disabled={savingCooks || !newCookName.trim()} style={{ flex: 1, background: 'var(--primary-green)', color: 'white', padding: '6px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: (savingCooks || !newCookName.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                    {savingCooks ? 'Guardant...' : 'Afegir'}
+                  </button>
+                  <button onClick={() => { setAddingCook(false); setNewCookName(''); }} style={{ flex: 1, background: '#e2e8f0', color: '#475569', padding: '6px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer' }}>Cancel·lar</button>
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ padding: '10px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: dia.cocineros ? 'var(--text-main)' : '#94a3b8', fontSize: '14px', minHeight: '42px' }}>
-            {dia.cocineros || 'Sense assignar'}
-          </div>
-        </div>
+        )}
 
         {/* Menú */}
         <div>
@@ -160,36 +244,19 @@ function DiaFestaCard({ dia, programacion, userName, isDiaPenyes, onUpdate }) {
           )}
         </div>
 
-        {/* Comensals */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>🍽️ Comensals ({dia.participantes ? dia.participantes.split(',').filter(p => p.trim()).length : 0})</h3>
-            {!editingComensals ? (
-              <button onClick={() => setEditingComensals(true)} style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--primary-blue)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
-                Editar
-              </button>
-            ) : null}
-          </div>
-          
-          {editingComensals ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <textarea 
-                value={comensalsText} 
-                onChange={e => setComensalsText(e.target.value)} 
-                placeholder="Separa els noms per comes..." 
-                style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--primary-blue)', width: '100%', fontSize: '14px', minHeight: '80px', resize: 'vertical' }}
-              />
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <button onClick={handleSaveComensals} disabled={savingComensals} style={{ background: 'var(--primary-blue)', color: 'white', padding: '6px 12px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>{savingComensals ? 'Guardant...' : 'Guardar'}</button>
-                <button onClick={() => { setEditingComensals(false); setComensalsText(dia.participantes || ''); }} style={{ background: '#f1f5f9', color: '#475569', padding: '6px 12px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer' }}>Cancel·lar</button>
-              </div>
+        {/* Comensals (Només Lectura) */}
+        {!isDiaPenyes && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>
+                🍽️ Comensals ({dia.participantes ? dia.participantes.split(',').filter(p => p.trim()).length : 0})
+              </h3>
             </div>
-          ) : (
             <div style={{ padding: '10px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: dia.participantes ? 'var(--text-main)' : '#94a3b8', fontSize: '13px', minHeight: '60px', whiteSpace: 'pre-wrap' }}>
-              {dia.participantes || 'Cap comensal afegit...'}
+              {dia.participantes || 'Cap comensal apuntat des del formulari...'}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Programació del dia */}
         <div style={{ marginTop: 'auto', paddingTop: '15px' }}>
@@ -215,6 +282,7 @@ export default function FestesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [diesFestes, setDiesFestes] = useState([]);
+  const [respostes, setRespostes] = useState([]);
   const [userName, setUserName] = useState('');
 
   const loadData = async () => {
@@ -225,10 +293,17 @@ export default function FestesPage() {
     }
     setUserName(user.user_metadata?.full_name || user.email);
     
-    const dies = await getDiesFestesAmbDades();
+    const [dies, respostesList] = await Promise.all([
+      getDiesFestesAmbDades(),
+      getRespostes()
+    ]);
+    
     setDiesFestes(dies);
+    setRespostes(respostesList);
     setLoading(false);
   };
+
+  const allAssignedCooksArray = diesFestes.flatMap(d => d.cocineros ? d.cocineros.split(/[,i]+/).map(c => c.trim()).filter(Boolean) : []);
 
   useEffect(() => {
     loadData();
@@ -280,6 +355,8 @@ export default function FestesPage() {
               dia={dia} 
               programacion={programacion} 
               userName={userName}
+              respostes={respostes}
+              allAssignedCooksArray={allAssignedCooksArray}
               isDiaPenyes={isDiaPenyes}
               onUpdate={loadData}
             />

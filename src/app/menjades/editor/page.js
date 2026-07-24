@@ -148,13 +148,13 @@ export default function EditorCuinersPage() {
 
   if (loading) return <div className="container" style={{marginTop: '50px', textAlign: 'center'}}>Carregant editor...</div>;
 
-  const meal1 = menjades.find(m => m.id.toString() === meal1Id);
+  const meal1 = menjades.find(m => m.id?.toString() === meal1Id);
   const cooks1 = meal1 ? extractCooks(meal1.cocineros) : [];
   
-  const meal2 = menjades.find(m => m.id.toString() === meal2Id);
+  const meal2 = menjades.find(m => m.id?.toString() === meal2Id);
   const cooks2 = meal2 ? extractCooks(meal2.cocineros) : [];
 
-  const actMeal = menjades.find(m => m.id.toString() === actionMealId);
+  const actMeal = menjades.find(m => m.id?.toString() === actionMealId);
   const actCooks = actMeal ? extractCooks(actMeal.cocineros) : [];
 
   const formatMealOption = (m) => {
