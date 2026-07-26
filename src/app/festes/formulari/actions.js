@@ -7,7 +7,7 @@ export async function getDiesFestes() {
   const currentYear = new Date().getFullYear().toString();
   // Ocultar Dia de les Penyes (no es cuina, es dina tots junts i no cal formulari)
   const { rows } = await db.query(
-    "SELECT id, fecha, tipo_comida FROM comidas WHERE dia = 'Festes' AND fecha LIKE $1 AND fecha != '2026-08-10' ORDER BY fecha ASC",
+    "SELECT id, fecha, tipo_comida FROM comidas WHERE dia = 'Festes' AND fecha LIKE $1 ORDER BY fecha ASC",
     [`${currentYear}%`]
   );
   return rows;

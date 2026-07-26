@@ -98,7 +98,7 @@ export default function FestesFormulariPage() {
       <div style={{ textAlign: 'center', marginBottom: '30px', background: 'var(--primary-orange)', padding: '20px', borderRadius: '12px', color: 'black' }}>
         <img src="/icon.jpeg" alt="Penya Albenc" style={{ width: '240px', height: '120px', objectFit: 'contain', marginBottom: '15px' }} />
         <h1 style={{ margin: 0, fontSize: '24px' }}>🍽️ Organització Festes</h1>
-        <p style={{ marginTop: '10px', fontSize: '15px', opacity: 0.9 }}>Emplena aquest formulari per indicar quins dies soparàs a la Penya i quins dies pots ajudar a cuinar.</p>
+        <p style={{ marginTop: '10px', fontSize: '15px', opacity: 0.9 }}>Reompli aquest formulari per indicar quins dies soparàs a la Penya i quins dies pots ajudar a cuinar.</p>
       </div>
 
       {loading ? (
@@ -147,12 +147,15 @@ export default function FestesFormulariPage() {
                 return (
                   <div key={dia.id || `dia-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', background: isSopar ? '#f8fafc' : 'white' }}>
                     <div style={{ flex: 1 }}>
-                      <strong style={{ display: 'block', color: 'black' }}>{dayOfWeek(dia.fecha)} {formatDay(dia.fecha)}</strong>
+                      <strong style={{ display: 'block', color: 'black' }}>
+                        {dayOfWeek(dia.fecha)} {formatDay(dia.fecha)}
+                        {dia.fecha === '2026-08-10' && ' (Dia de les Penyes)'}
+                      </strong>
                     </div>
                     
                     <div style={{ display: 'flex', gap: '15px' }}>
                       <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-                        <span style={{ fontSize: '12px', marginBottom: '4px', color: isSopar ? '#0f172a' : '#94a3b8' }}>🍽️ Sopar</span>
+                        <span style={{ fontSize: '12px', marginBottom: '4px', color: isSopar ? '#0f172a' : '#94a3b8' }}>🍽️ Vaig a sopar</span>
                         <input 
                           type="checkbox" 
                           checked={isSopar}
@@ -161,9 +164,9 @@ export default function FestesFormulariPage() {
                         />
                       </label>
                       
-                      {esAdult && (
+                      {esAdult && dia.fecha !== '2026-08-10' && (
                         <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-                          <span style={{ fontSize: '12px', marginBottom: '4px', color: isCuinar ? '#16a34a' : '#94a3b8' }}>🧑‍🍳 Cuinar</span>
+                          <span style={{ fontSize: '12px', marginBottom: '4px', color: isCuinar ? '#16a34a' : '#94a3b8' }}>🧑‍🍳 Puc cuinar</span>
                           <input 
                             type="checkbox" 
                             checked={isCuinar}
