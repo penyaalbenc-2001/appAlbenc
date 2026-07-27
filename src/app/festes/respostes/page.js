@@ -37,18 +37,32 @@ export default function RespostesFestesPage() {
     const element = document.getElementById('taula-respostes');
     
     const opt = {
-      margin:       10,
+      margin:       5, // mm
       filename:     `Disponibilitat_Festes.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      html2canvas:  { scale: 2, useCORS: true, windowWidth: element.scrollWidth, width: element.scrollWidth },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     
-    html2pdf().from(element).set(opt).save();
+    // Temporarily remove overflow to ensure full capture if screen is small
+    const parent = element.parentElement;
+    const originalOverflow = parent.style.overflowX;
+    parent.style.overflowX = 'visible';
+    
+    await html2pdf().from(element).set(opt).save();
+    
+    parent.style.overflowX = originalOverflow;
   };
 
   const formatDay = (dateStr) => {
     return dateStr.split('-')[2]; // YYYY-MM-DD -> DD
+  };
+
+  const formatName = (fullName) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
   };
 
   if (loading) return <div style={{textAlign:'center', marginTop:'50px'}}>Carregant resultats...</div>;
@@ -75,11 +89,11 @@ export default function RespostesFestesPage() {
           
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white' }}>
-                <th style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'left', minWidth: '150px' }}>Nom i Cognoms</th>
-                <th style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'center', width: '90px' }}>Tipus</th>
+              <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white', fontSize: '12px' }}>
+                <th style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap' }}>Nom i Cognoms</th>
+                <th style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Tipus</th>
                 {diesFestes.map((dia, idx) => (
-                  <th key={dia.id || `dia-${idx}`} style={{ padding: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                  <th key={dia.id || `dia-${idx}`} style={{ padding: '4px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
                     {formatDay(dia.fecha)}
                   </th>
                 ))}
@@ -91,12 +105,12 @@ export default function RespostesFestesPage() {
                 const diesSoparArr = typeof resp.dies_sopar === 'string' ? JSON.parse(resp.dies_sopar) : (resp.dies_sopar || []);
                 
                 return (
-                  <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white' }}>
-                    <td style={{ padding: '10px', border: '1px solid #cbd5e1', fontWeight: '500' }}>
-                      {resp.nom_cognoms}
+                  <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '12px' }}>
+                    <td style={{ padding: '6px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap' }}>
+                      {formatName(resp.nom_cognoms)}
                     </td>
-                    <td style={{ padding: '10px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '13px' }}>
-                      {resp.es_adult ? '👨🏽 Adult' : '👧🏽 Xiquet'}
+                    <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '14px' }}>
+                      <span title={resp.es_adult ? 'Adult' : 'Xiquet'}>{resp.es_adult ? '👨🏽' : '👧🏽'}</span>
                     </td>
                     {diesFestes.map((dia, idx) => {
                       const potCuinar = diesCuinarArr.includes(dia.fecha);
@@ -106,7 +120,7 @@ export default function RespostesFestesPage() {
                         <td 
                           key={dia.id || `td-${idx}`} 
                           style={{ 
-                            padding: '10px', 
+                            padding: '4px', 
                             border: '1px solid #cbd5e1', 
                             textAlign: 'center',
                             backgroundColor: potCuinar ? '#bbf7d0' : (veSopar ? '#f1f5f9' : 'transparent'),
@@ -114,7 +128,7 @@ export default function RespostesFestesPage() {
                             color: potCuinar ? '#166534' : 'inherit'
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', fontSize: '14px' }}>
                             {veSopar && <span title="Ve a sopar">🍽️</span>}
                             {potCuinar && <span title="S'ofereix per a cuinar">🧑‍🍳</span>}
                           </div>
@@ -126,24 +140,37 @@ export default function RespostesFestesPage() {
               })}
             </tbody>
             <tfoot>
-              <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold' }}>
-                <td colSpan="2" style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
+              <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '12px' }}>
+                <td colSpan="2" style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
                 {diesFestes.map((dia, idx) => {
-                  const totalSopars = respostes.filter(r => {
+                  const comensals = respostes.filter(r => {
                     const s = typeof r.dies_sopar === 'string' ? JSON.parse(r.dies_sopar) : (r.dies_sopar || []);
                     return s.includes(dia.fecha);
-                  }).length;
-                  return <td key={`tot-sopar-${idx}`} style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'center', color: 'var(--primary-blue-dark)' }}>{totalSopars}</td>;
+                  });
+                  const totalSopars = comensals.length;
+                  const adultsCount = comensals.filter(r => r.es_adult).length;
+                  const xiquetsCount = comensals.filter(r => !r.es_adult).length;
+                  
+                  return (
+                    <td key={`tot-sopar-${idx}`} style={{ padding: '4px', border: '1px solid #cbd5e1', textAlign: 'center', color: 'var(--primary-blue-dark)' }}>
+                      <div>{totalSopars}</div>
+                      {totalSopars > 0 && (
+                        <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                          👨🏽{adultsCount} 👧🏽{xiquetsCount}
+                        </div>
+                      )}
+                    </td>
+                  );
                 })}
               </tr>
-              <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold' }}>
-                <td colSpan="2" style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Voluntaris Cuina:</td>
+              <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', fontSize: '12px' }}>
+                <td colSpan="2" style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
                 {diesFestes.map((dia, idx) => {
                   const totalCuiners = respostes.filter(r => {
                     const c = typeof r.dies_cuinar === 'string' ? JSON.parse(r.dies_cuinar) : (r.dies_cuinar || []);
                     return c.includes(dia.fecha);
                   }).length;
-                  return <td key={`tot-cuina-${idx}`} style={{ padding: '12px', border: '1px solid #cbd5e1', textAlign: 'center', color: '#166534' }}>{totalCuiners}</td>;
+                  return <td key={`tot-cuina-${idx}`} style={{ padding: '4px', border: '1px solid #cbd5e1', textAlign: 'center', color: '#166534' }}>{totalCuiners}</td>;
                 })}
               </tr>
             </tfoot>
@@ -168,7 +195,7 @@ export default function RespostesFestesPage() {
             return (
               <details key={`det-${resp.id}`} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <summary style={{ fontWeight: 'bold', cursor: 'pointer', outline: 'none', padding: '5px' }}>
-                  {resp.nom_cognoms} {resp.es_adult ? '👨🏽' : '👧🏽'}
+                  {formatName(resp.nom_cognoms)} {resp.es_adult ? '👨🏽' : '👧🏽'}
                 </summary>
                 <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f8fafc', borderRadius: '6px', fontSize: '14px' }}>
                   <p style={{ marginBottom: '8px' }}><strong>🍽️ Dies que sopa ({diesSoparArr.length}):</strong></p>

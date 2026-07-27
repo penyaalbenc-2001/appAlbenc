@@ -38,12 +38,19 @@ export default function EstadistiquesFestesPage() {
   if (loading) return <div style={{textAlign:'center', marginTop:'50px'}}>Calculant estadístiques històriques...</div>;
   if (error) return <div style={{textAlign:'center', marginTop:'50px', color: 'red'}}>{error}</div>;
 
+  const formatName = (fullName) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
+  };
+
   // Prepare chart data for ranking of Saturdays
   const chartData = [...stats]
     .sort((a, b) => b.dissabtes - a.dissabtes)
     .filter(s => s.dissabtes > 0)
     .map(s => ({
-      name: s.nom,
+      name: formatName(s.nom),
       dissabtes: s.dissabtes
     }));
 
@@ -93,7 +100,7 @@ export default function EstadistiquesFestesPage() {
                       {medal}
                     </td>
                     <td style={{ padding: '15px', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                      {s.nom}
+                      {formatName(s.nom)}
                     </td>
                     <td style={{ padding: '15px', textAlign: 'center', fontSize: '18px', color: 'var(--primary-green)', fontWeight: 'bold' }}>
                       {s.total}

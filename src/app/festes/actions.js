@@ -60,3 +60,69 @@ export async function updateFestesCooks(id, newCooksString, oldCooksString, user
   }
 }
 
+export async function addComensalFesta(fecha, nom, esAdult, userNom) {
+  const { rows } = await db.query(
+    "SELECT id, dies_sopar FROM festes_assistencia WHERE nom_cognoms = $1",
+    [nom]
+  );
+  
+  if (rows.length > 0) {
+    const user = rows[0];
+    let diesSopar = [];
+    try {
+      diesSopar = typeof user.dies_sopar === 'string' ? JSON.parse(user.dies_sopar) : (user.dies_sopar || []);
+    } catch(e) {}
+    
+    if (!diesSopar.includes(fecha)) {
+      diesSopar.push(fecha);
+      await db.query(
+        "UPDATE festes_assistencia SET dies_sopar = $1 WHERE id = $2",
+        [JSON.stringify(diesSopar), user.id]
+      );
+    }
+  } else {
+    await db.query(
+      "INSERT INTO festes_assistencia (nom_cognoms, es_adult, dies_sopar, dies_cuinar) VALUES ($1, $2, $3, $4)",
+      [nom, esAdult, JSON.stringify([fecha]), JSON.stringify([])]
+    );
+  }
+
+  await registrarActivitat(
+    userNom,
+    'Festes',
+    `ha afegit a ${nom} com a comensal el ${fecha}.`,
+    `🍽️ <b>Nou Comensal a Festes</b>\n\n${userNom} ha afegit a ${nom} al sopar del dia ${fecha}.`
+  );
+}
+
+export async function removeComensalFesta(fecha, nom, userNom) {
+  const { rows } = await db.query(
+    "SELECT id, dies_sopar FROM festes_assistencia WHERE nom_cognoms = $1",
+    [nom]
+  );
+  
+  if (rows.length > 0) {
+    const user = rows[0];
+    let diesSopar = [];
+    try {
+      diesSopar = typeof user.dies_sopar === 'string' ? JSON.parse(user.dies_sopar) : (user.dies_sopar || []);
+    } catch(e) {}
+    
+    const index = diesSopar.indexOf(fecha);
+    if (index > -1) {
+      diesSopar.splice(index, 1);
+      await db.query(
+        "UPDATE festes_assistencia SET dies_sopar = $1 WHERE id = $2",
+        [JSON.stringify(diesSopar), user.id]
+      );
+      
+      await registrarActivitat(
+        userNom,
+        'Festes',
+        `ha esborrat a ${nom} com a comensal el ${fecha}.`,
+        `🗑️ <b>Comensal Eliminat de Festes</b>\n\n${userNom} ha tret a ${nom} del sopar del dia ${fecha}.`
+      );
+    }
+  }
+}
+

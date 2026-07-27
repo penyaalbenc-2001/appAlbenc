@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getDiesFestesAmbDades, updateMenuFesta, updateFestesCooks } from './actions';
+import { getDiesFestesAmbDades, updateMenuFesta, updateFestesCooks, addComensalFesta, removeComensalFesta } from './actions';
 import { getRespostes } from './respostes/actions';
 import Link from 'next/link';
 
@@ -71,12 +71,25 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
   const [addingCook, setAddingCook] = useState(false);
   const [newCookName, setNewCookName] = useState('');
 
+  const [savingComensals, setSavingComensals] = useState(false);
+  const [addingComensal, setAddingComensal] = useState(false);
+  const [deletingComensal, setDeletingComensal] = useState(false);
+  const [newComensalName, setNewComensalName] = useState('');
+  const [newComensalEsAdult, setNewComensalEsAdult] = useState(true);
+
   const dayOfWeek = (dateStr) => {
     const d = new Date(dateStr);
     const dies = ['Diumenge', 'Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte'];
     return dies[d.getDay()];
   };
   const formatDay = (dateStr) => dateStr.split('-')[2];
+
+  const formatName = (fullName) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
+  };
 
   const handleSaveMenu = async () => {
     setSavingMenu(true);
@@ -105,6 +118,27 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
     setAddingCook(false);
     setSavingCooks(false);
     onUpdate();
+  };
+
+  const handleAddComensal = async () => {
+    if (!newComensalName.trim()) return;
+    if (window.confirm(`Estàs segur que vols afegir a ${newComensalName} com a ${newComensalEsAdult ? 'Adult' : 'Xiquet'} el dia ${formatDay(dia.fecha)}?`)) {
+      setSavingComensals(true);
+      await addComensalFesta(dia.fecha, newComensalName.trim(), newComensalEsAdult, userName);
+      setNewComensalName('');
+      setAddingComensal(false);
+      setSavingComensals(false);
+      onUpdate();
+    }
+  };
+
+  const handleRemoveComensal = async (comensal) => {
+    if (window.confirm(`Estàs segur que vols esborrar a ${comensal.nom_cognoms} d'aquest dia?`)) {
+      setSavingComensals(true);
+      await removeComensalFesta(dia.fecha, comensal.nom_cognoms, userName);
+      setSavingComensals(false);
+      onUpdate();
+    }
   };
 
   return (
@@ -147,7 +181,7 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
               ) : (
                 initialCooks.map((cook, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--primary-blue-light)', color: 'var(--primary-blue-dark)', padding: '4px 10px', borderRadius: '16px', fontSize: '13px', fontWeight: '500' }}>
-                    {cook}
+                    {formatName(cook)}
                     <button 
                       onClick={() => handleRemoveCook(cook)} 
                       disabled={savingCooks}
@@ -187,7 +221,7 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
                       const isAlreadyCookingOtherDay = allAssignedCooksArray.includes(r.nom_cognoms);
                       return (
                         <option key={r.id} value={r.nom_cognoms} disabled={isAlreadyCookingOtherDay}>
-                          {r.nom_cognoms} {isAlreadyCookingOtherDay ? '(Ja cuina un altre dia)' : ''}
+                          {formatName(r.nom_cognoms)} {isAlreadyCookingOtherDay ? '(Ja cuina un altre dia)' : ''}
                         </option>
                       );
                     });
@@ -249,11 +283,118 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>
-                🍽️ Comensals ({dia.participantes ? dia.participantes.split(',').filter(p => p.trim()).length : 0})
+                {(() => {
+                  const comensalsAquestDia = respostes.filter(r => {
+                    try {
+                      const diesSopar = typeof r.dies_sopar === 'string' ? JSON.parse(r.dies_sopar) : (r.dies_sopar || []);
+                      return diesSopar.includes(dia.fecha);
+                    } catch(e) { return false; }
+                  });
+                  const adultsCount = comensalsAquestDia.filter(r => r.es_adult).length;
+                  const xiquetsCount = comensalsAquestDia.filter(r => !r.es_adult).length;
+                  
+                  return (
+                    <>
+                      🍽️ Comensals ({comensalsAquestDia.length})
+                      <span style={{fontSize:'13px', fontWeight:'normal', marginLeft:'6px', color:'#64748b'}}>
+                        (👨🏽 {adultsCount} {adultsCount === 1 ? 'Adult' : 'Adults'} - 👧🏽 {xiquetsCount} {xiquetsCount === 1 ? 'Xiquet' : 'Xiquets'})
+                      </span>
+                    </>
+                  );
+                })()}
               </h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {!addingComensal && !deletingComensal && (
+                  <>
+                    <button onClick={() => setAddingComensal(true)} style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--primary-blue)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                      + Afegir
+                    </button>
+                    <button onClick={() => setDeletingComensal(true)} style={{ background: 'none', border: 'none', fontSize: '12px', color: '#dc2626', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                      - Esborrar
+                    </button>
+                  </>
+                )}
+                {deletingComensal && (
+                  <button onClick={() => setDeletingComensal(false)} style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--primary-blue)', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>
+                    Fet
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ padding: '10px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: dia.participantes ? 'var(--text-main)' : '#94a3b8', fontSize: '13px', minHeight: '60px', whiteSpace: 'pre-wrap' }}>
-              {dia.participantes || 'Cap comensal apuntat des del formulari...'}
+            
+            {addingComensal && (
+              <div style={{ marginBottom: '10px', padding: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={newComensalName} 
+                  onChange={(e) => setNewComensalName(e.target.value)} 
+                  placeholder="Nom del comensal..."
+                  style={{ padding: '8px', borderRadius: '6px', border: '1px solid #94a3b8', width: '100%', fontSize: '14px' }}
+                />
+                <select 
+                  value={newComensalEsAdult ? 'true' : 'false'} 
+                  onChange={(e) => setNewComensalEsAdult(e.target.value === 'true')} 
+                  style={{ padding: '8px', borderRadius: '6px', border: '1px solid #94a3b8', width: '100%', fontSize: '14px' }}
+                >
+                  <option value="true">👨🏽 Adult</option>
+                  <option value="false">👧🏽 Xiquet</option>
+                </select>
+                <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
+                  <button onClick={handleAddComensal} disabled={savingComensals || !newComensalName.trim()} style={{ flex: 1, background: 'var(--primary-green)', color: 'white', padding: '6px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: (savingComensals || !newComensalName.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                    {savingComensals ? 'Guardant...' : 'Afegir'}
+                  </button>
+                  <button onClick={() => { setAddingComensal(false); setNewComensalName(''); }} style={{ flex: 1, background: '#e2e8f0', color: '#475569', padding: '6px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer' }}>Cancel·lar</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ padding: '10px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: dia.participantes ? 'var(--text-main)' : '#94a3b8', fontSize: '13px', minHeight: '60px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+              {(() => {
+                const comensalsAquestDia = respostes.filter(r => {
+                  try {
+                    const diesSopar = typeof r.dies_sopar === 'string' ? JSON.parse(r.dies_sopar) : (r.dies_sopar || []);
+                    return diesSopar.includes(dia.fecha);
+                  } catch(e) { return false; }
+                });
+                
+                if (comensalsAquestDia.length === 0) return 'Cap comensal apuntat des del formulari...';
+                
+                const adults = comensalsAquestDia.filter(r => r.es_adult);
+                const xiquets = comensalsAquestDia.filter(r => !r.es_adult);
+                
+                const renderComensalBadge = (comensal) => (
+                  <div key={comensal.id || comensal.nom_cognoms} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '12px', fontSize: '13px', margin: '2px 4px 2px 0' }}>
+                    {formatName(comensal.nom_cognoms)}
+                    {deletingComensal && (
+                      <button 
+                        onClick={() => handleRemoveComensal(comensal)} 
+                        disabled={savingComensals}
+                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: savingComensals ? 'wait' : 'pointer', padding: 0, opacity: 0.7, display: 'flex', alignItems: 'center' }}
+                        title="Eliminar comensal"
+                      >
+                        ✖
+                      </button>
+                    )}
+                  </div>
+                );
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {adults.length > 0 && (
+                      <div>
+                        <strong style={{display: 'block', marginBottom: '4px'}}>👨🏽 Adults:</strong> 
+                        <div style={{display: 'flex', flexWrap: 'wrap'}}>{adults.map(renderComensalBadge)}</div>
+                      </div>
+                    )}
+                    {xiquets.length > 0 && (
+                      <div>
+                        <strong style={{display: 'block', marginBottom: '4px'}}>👧🏽 Xiquets:</strong> 
+                        <div style={{display: 'flex', flexWrap: 'wrap'}}>{xiquets.map(renderComensalBadge)}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
