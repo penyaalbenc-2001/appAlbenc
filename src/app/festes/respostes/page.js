@@ -43,10 +43,16 @@ export default function RespostesFestesPage() {
       html2canvas:  { 
         scale: 2, 
         useCORS: true, 
-        windowWidth: Math.max(element.scrollWidth, 1024), 
-        width: Math.max(element.scrollWidth, 1024) 
+        windowWidth: element.scrollWidth, 
+        width: element.scrollWidth 
       },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      // Usar altura dinámica basada en las filas para que quepa todo en 1 página,
+      // pero forzando formato vertical (portrait).
+      jsPDF:        { 
+        unit: 'px', 
+        format: [Math.max(element.scrollWidth + 40, 600), Math.max(element.scrollHeight + 60, 800)], 
+        orientation: 'portrait' 
+      }
     };
     
     // Temporarily remove overflow to ensure full capture if screen is small
@@ -92,13 +98,13 @@ export default function RespostesFestesPage() {
         <div id="taula-respostes" style={{ padding: '20px' }}>
           <h2 style={{ textAlign: 'center', color: 'var(--primary-orange)', marginBottom: '20px' }}>Disponibilitat Penya Albenc</h2>
           
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white', fontSize: '12px' }}>
-                <th style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap' }}>Nom i Cognoms</th>
-                <th style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Tipus</th>
+              <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white', fontSize: '10px' }}>
+                <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap' }}>Nom i Cognoms</th>
+                <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Tipus</th>
                 {diesFestes.map((dia, idx) => (
-                  <th key={dia.id || `dia-${idx}`} style={{ padding: '4px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                  <th key={dia.id || `dia-${idx}`} style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '35px' }}>
                     {formatDay(dia.fecha)}
                   </th>
                 ))}
@@ -110,11 +116,11 @@ export default function RespostesFestesPage() {
                 const diesSoparArr = typeof resp.dies_sopar === 'string' ? JSON.parse(resp.dies_sopar) : (resp.dies_sopar || []);
                 
                 return (
-                  <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '12px' }}>
-                    <td style={{ padding: '6px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap' }}>
+                  <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '10px' }}>
+                    <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap' }}>
                       {formatName(resp.nom_cognoms)}
                     </td>
-                    <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '14px' }}>
+                    <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px' }}>
                       <span title={resp.es_adult ? 'Adult' : 'Xiquet'}>{resp.es_adult ? '👨🏽' : '👧🏽'}</span>
                     </td>
                     {diesFestes.map((dia, idx) => {
@@ -125,7 +131,7 @@ export default function RespostesFestesPage() {
                         <td 
                           key={dia.id || `td-${idx}`} 
                           style={{ 
-                            padding: '4px', 
+                            padding: '2px', 
                             border: '1px solid #cbd5e1', 
                             textAlign: 'center',
                             backgroundColor: potCuinar ? '#bbf7d0' : (veSopar ? '#f1f5f9' : 'transparent'),
@@ -145,8 +151,8 @@ export default function RespostesFestesPage() {
               })}
             </tbody>
             <tfoot>
-              <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '12px' }}>
-                <td colSpan="2" style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
+              <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '10px' }}>
+                <td colSpan="2" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
                 {diesFestes.map((dia, idx) => {
                   const comensals = respostes.filter(r => {
                     const s = typeof r.dies_sopar === 'string' ? JSON.parse(r.dies_sopar) : (r.dies_sopar || []);
@@ -168,14 +174,14 @@ export default function RespostesFestesPage() {
                   );
                 })}
               </tr>
-              <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', fontSize: '12px' }}>
-                <td colSpan="2" style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
+              <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', fontSize: '10px' }}>
+                <td colSpan="2" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
                 {diesFestes.map((dia, idx) => {
                   const totalCuiners = respostes.filter(r => {
                     const c = typeof r.dies_cuinar === 'string' ? JSON.parse(r.dies_cuinar) : (r.dies_cuinar || []);
                     return c.includes(dia.fecha);
                   }).length;
-                  return <td key={`tot-cuina-${idx}`} style={{ padding: '4px', border: '1px solid #cbd5e1', textAlign: 'center', color: '#166534' }}>{totalCuiners}</td>;
+                  return <td key={`tot-cuina-${idx}`} style={{ padding: '2px', border: '1px solid #cbd5e1', textAlign: 'center', color: '#166534' }}>{totalCuiners}</td>;
                 })}
               </tr>
             </tfoot>
