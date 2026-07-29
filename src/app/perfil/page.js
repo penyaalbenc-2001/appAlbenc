@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { getMembreByUserId } from './actions';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Perfil() {
   const [user, setUser] = useState(null);
   const [membre, setMembre] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { t, language, changeLanguage } = useLanguage();
 
   useEffect(() => {
     async function loadProfile() {
@@ -37,7 +39,7 @@ export default function Perfil() {
 
   return (
     <div className="container" style={{ marginTop: '50px', marginBottom: '100px' }}>
-      <h1 className="title" style={{ textAlign: 'center' }}>El teu Perfil</h1>
+      <h1 className="title" style={{ textAlign: 'center' }}>{t('profile.title')}</h1>
       
       <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
         <div style={{ 
@@ -54,15 +56,27 @@ export default function Perfil() {
           <p style={{ color: 'var(--text-muted)' }}>{user?.email}</p>
         </div>
 
+        <div style={{ width: '100%', marginTop: '10px' }}>
+          <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block', textAlign: 'center' }}>{t('auth.language')}</label>
+          <select 
+            value={language}
+            onChange={(e) => changeLanguage(e.target.value)}
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white', textAlign: 'center' }}
+          >
+            <option value="ca">{t('auth.catalan')}</option>
+            <option value="es">{t('auth.spanish')}</option>
+          </select>
+        </div>
+
         <button 
           onClick={handleLogout} 
           style={{ 
-            marginTop: '20px', padding: '10px 20px', borderRadius: '8px',
+            marginTop: '10px', padding: '10px 20px', borderRadius: '8px', width: '100%',
             backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5',
             fontWeight: '600'
           }}
         >
-          Tancar Sessió
+          {t('profile.logout')}
         </button>
       </div>
 

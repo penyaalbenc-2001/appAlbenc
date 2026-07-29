@@ -12,6 +12,7 @@ export default function Registre() {
   const [showPassword, setShowPassword] = useState(false);
   const [membres, setMembres] = useState([]);
   const [selectedMembreId, setSelectedMembreId] = useState('');
+  const [idioma, setIdioma] = useState('ca');
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,8 @@ export default function Registre() {
 
       // Assign the member in the DB
       try {
-        await assignarMembre(parseInt(selectedMembreId), data.user.id);
+        await assignarMembre(parseInt(selectedMembreId), data.user.id, idioma);
+        localStorage.setItem('language', idioma); // Save preference locally as well
 
         setSuccess(true);
         setRegistering(false);
@@ -127,6 +129,19 @@ export default function Registre() {
                 required 
                 style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
               />
+            </div>
+
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '5px', display: 'block' }}>Idioma de Preferència</label>
+              <select 
+                value={idioma}
+                onChange={(e) => setIdioma(e.target.value)}
+                required 
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white' }}
+              >
+                <option value="ca">Català</option>
+                <option value="es">Castellano</option>
+              </select>
             </div>
             
             <div>

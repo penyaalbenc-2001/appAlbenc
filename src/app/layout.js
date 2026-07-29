@@ -21,14 +21,18 @@ export const metadata = {
   }
 };
 
+import { LanguageProvider } from '@/context/LanguageContext';
+
 export default function RootLayout({ children }) {
   return (
     <html lang="ca-VA">
       <body>
-        <main className="fade-in">
-          {children}
-        </main>
-        <Navigation />
+        <LanguageProvider>
+          <main className="fade-in">
+            {children}
+          </main>
+          <Navigation />
+        </LanguageProvider>
       </body>
     </html>
   );

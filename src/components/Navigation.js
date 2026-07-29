@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Navigation() {
   const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     async function checkUser() {
@@ -23,19 +25,19 @@ export default function Navigation() {
   if (pathname === '/login' || pathname === '/registre') return null;
 
   const mainNavItems = [
-    { name: 'Inici', path: '/', icon: HomeIcon },
-    { name: 'Menjars', path: '/menjades', icon: FoodIcon },
-    { name: 'Comptes', path: '/comptes', icon: BanknotesIcon },
-    { name: 'Agenda', path: '/agenda', icon: CalendarIcon },
-    { name: 'Perfil', path: '/perfil', icon: UserIcon },
+    { name: t('nav.home'), path: '/', icon: HomeIcon },
+    { name: t('nav.meals'), path: '/menjades', icon: FoodIcon },
+    { name: t('nav.accounts'), path: '/comptes', icon: BanknotesIcon },
+    { name: t('nav.calendar'), path: '/agenda', icon: CalendarIcon },
+    { name: t('nav.profile'), path: '/perfil', icon: UserIcon },
   ];
 
   const moreNavItems = [
-    { name: 'Llista Compra', path: '/compra' },
-    { name: 'Festes', path: '/festes' },
-    { name: 'Manteniment', path: '/manteniment' },
-    { name: 'Reunions', path: '/reuniones' },
-    { name: 'Notícies', path: '/noticies' },
+    { name: t('nav.shoppingList'), path: '/compra' },
+    { name: t('nav.parties'), path: '/festes' },
+    { name: t('nav.maintenance'), path: '/manteniment' },
+    { name: t('nav.meetings'), path: '/reuniones' },
+    { name: t('nav.news'), path: '/noticies' },
   ];
 
   return (
@@ -64,7 +66,7 @@ export default function Navigation() {
           style={{ background: 'transparent' }}
         >
           <MenuIcon />
-          <span>Més</span>
+          <span>{t('nav.more')}</span>
         </button>
       </nav>
 
@@ -114,7 +116,7 @@ export default function Navigation() {
                 textDecoration: 'none'
               }}
             >
-              ⚙️ Panell Admin
+              {t('nav.adminPanel')}
             </Link>
           )}
         </div>

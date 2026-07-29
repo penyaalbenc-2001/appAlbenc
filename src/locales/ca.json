@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "home": "Inici",
+    "meals": "Menjars",
+    "accounts": "Comptes",
+    "calendar": "Agenda",
+    "profile": "Perfil",
+    "more": "Més",
+    "shoppingList": "Llista Compra",
+    "parties": "Festes",
+    "maintenance": "Manteniment",
+    "meetings": "Reunions",
+    "news": "Notícies",
+    "adminPanel": "⚙️ Panell Admin"
+  },
+  "auth": {
+    "login": "Iniciar Sessió",
+    "register": "Registrar-se",
+    "language": "Idioma",
+    "catalan": "Català",
+    "spanish": "Castellano"
+  },
+  "profile": {
+    "title": "El teu Perfil",
+    "logout": "Tancar Sessió",
+    "changeLanguage": "Canviar Idioma",
+    "save": "Desar"
+  },
+  "home": {
+    "welcome": "Benvinguts a la Penya l'Albenc"
+  }
+}
