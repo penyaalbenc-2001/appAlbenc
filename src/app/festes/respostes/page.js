@@ -40,8 +40,13 @@ export default function RespostesFestesPage() {
       margin:       5, // mm
       filename:     `Disponibilitat_Festes.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, windowWidth: element.scrollWidth, width: element.scrollWidth },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        windowWidth: Math.max(element.scrollWidth, 1024), 
+        width: Math.max(element.scrollWidth, 1024) 
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
     };
     
     // Temporarily remove overflow to ensure full capture if screen is small
