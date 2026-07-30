@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getDiesFestes } from '../formulari/actions';
-import { getRespostes } from './actions';
+import { getRespostes, deleteResposta } from './actions';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -11,6 +11,7 @@ export default function RespostesFestesPage() {
   const [diesFestes, setDiesFestes] = useState([]);
   const [respostes, setRespostes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -23,6 +24,10 @@ export default function RespostesFestesPage() {
       
       const dies = await getDiesFestes();
       const resp = await getRespostes();
+      
+      if (user.email === 'penyaalbenc@gmail.com') {
+        setIsAdmin(true);
+      }
       
       setDiesFestes(dies);
       setRespostes(resp);
@@ -72,8 +77,21 @@ export default function RespostesFestesPage() {
   const formatName = (fullName) => {
     if (!fullName) return '';
     const parts = fullName.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0];
-    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
+    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    
+    if (parts.length === 1) return capitalize(parts[0]);
+    
+    const firstName = capitalize(parts[0]);
+    const surnames = parts.slice(1).map(part => part.charAt(0).toUpperCase() + '.').join(' ');
+    return `${firstName} ${surnames}`;
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Estàs segur que vols eliminar aquesta resposta?")) {
+      await deleteResposta(id);
+      const resp = await getRespostes();
+      setRespostes(resp);
+    }
   };
 
   if (loading) return <div style={{textAlign:'center', marginTop:'50px'}}>Carregant resultats...</div>;
@@ -103,6 +121,7 @@ export default function RespostesFestesPage() {
               <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white', fontSize: '10px' }}>
                 <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap' }}>Nom i Cognoms</th>
                 <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Tipus</th>
+                <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Data</th>
                 {diesFestes.map((dia, idx) => (
                   <th key={dia.id || `dia-${idx}`} style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '35px' }}>
                     {formatDay(dia.fecha)}
@@ -119,9 +138,17 @@ export default function RespostesFestesPage() {
                   <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '10px' }}>
                     <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap' }}>
                       {formatName(resp.nom_cognoms)}
+                      {isAdmin && (
+                        <button onClick={() => handleDelete(resp.id)} style={{ marginLeft: '6px', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }} title="Eliminar resposta">
+                          🗑️
+                        </button>
+                      )}
                     </td>
                     <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px' }}>
                       <span title={resp.es_adult ? 'Adult' : 'Xiquet'}>{resp.es_adult ? '👨🏽' : '👧🏽'}</span>
+                    </td>
+                    <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {resp.created_at ? new Date(resp.created_at).toLocaleDateString('ca-ES') : '-'}
                     </td>
                     {diesFestes.map((dia, idx) => {
                       const potCuinar = diesCuinarArr.includes(dia.fecha);
@@ -152,7 +179,7 @@ export default function RespostesFestesPage() {
             </tbody>
             <tfoot>
               <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '10px' }}>
-                <td colSpan="2" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
+                <td colSpan="3" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Total Sopars:</td>
                 {diesFestes.map((dia, idx) => {
                   const comensals = respostes.filter(r => {
                     const s = typeof r.dies_sopar === 'string' ? JSON.parse(r.dies_sopar) : (r.dies_sopar || []);
@@ -175,7 +202,7 @@ export default function RespostesFestesPage() {
                 })}
               </tr>
               <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', fontSize: '10px' }}>
-                <td colSpan="2" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
+                <td colSpan="3" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
                 {diesFestes.map((dia, idx) => {
                   const totalCuiners = respostes.filter(r => {
                     const c = typeof r.dies_cuinar === 'string' ? JSON.parse(r.dies_cuinar) : (r.dies_cuinar || []);
