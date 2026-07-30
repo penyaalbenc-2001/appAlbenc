@@ -46,8 +46,8 @@ export default function EstadistiquesFestesPage() {
     if (parts.length === 1) return capitalize(parts[0]);
     
     const firstName = capitalize(parts[0]);
-    const surnames = parts.slice(1).map(part => part.charAt(0).toUpperCase() + '.').join(' ');
-    return `${firstName} ${surnames}`;
+    const surname = parts[1].charAt(0).toUpperCase() + '.';
+    return `${firstName} ${surname}`;
   };
 
   // Prepare chart data for ranking of Saturdays

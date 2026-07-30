@@ -82,8 +82,8 @@ export default function RespostesFestesPage() {
     if (parts.length === 1) return capitalize(parts[0]);
     
     const firstName = capitalize(parts[0]);
-    const surnames = parts.slice(1).map(part => part.charAt(0).toUpperCase() + '.').join(' ');
-    return `${firstName} ${surnames}`;
+    const surname = parts[1].charAt(0).toUpperCase() + '.';
+    return `${firstName} ${surname}`;
   };
 
   const handleDelete = async (id) => {
@@ -119,7 +119,7 @@ export default function RespostesFestesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--primary-blue)', color: 'white', fontSize: '10px' }}>
-                <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap' }}>Nom i Cognoms</th>
+                <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'left', whiteSpace: 'nowrap', maxWidth: '80px', overflow: 'hidden' }}>Nom</th>
                 <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Tipus</th>
                 <th style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Data</th>
                 {diesFestes.map((dia, idx) => (
@@ -136,10 +136,10 @@ export default function RespostesFestesPage() {
                 
                 return (
                   <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '10px' }}>
-                    <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {formatName(resp.nom_cognoms)}
                       {isAdmin && (
-                        <button onClick={() => handleDelete(resp.id)} style={{ marginLeft: '6px', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }} title="Eliminar resposta">
+                        <button data-html2canvas-ignore="true" onClick={() => handleDelete(resp.id)} style={{ marginLeft: '6px', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }} title="Eliminar resposta">
                           🗑️
                         </button>
                       )}
