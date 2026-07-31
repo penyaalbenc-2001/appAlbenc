@@ -4,7 +4,7 @@ import db from '@/lib/db';
 import { registrarActivitat } from '@/lib/activitat';
 
 export async function getEsdeveniments() {
-  const { rows } = await db.query("SELECT * FROM eventos ORDER BY fecha ASC");
+  const { rows } = await db.query("SELECT * FROM eventos WHERE fecha >= CURRENT_DATE::text ORDER BY fecha ASC");
   return rows;
 }
 

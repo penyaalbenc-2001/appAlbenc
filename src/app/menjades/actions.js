@@ -9,7 +9,7 @@ export async function getAllMembres() {
 }
 
 export async function getMenjades() {
-  const { rows } = await db.query("SELECT * FROM comidas ORDER BY fecha ASC");
+  const { rows } = await db.query("SELECT * FROM comidas WHERE fecha >= CURRENT_DATE::text ORDER BY fecha ASC");
   return rows;
 }
 
