@@ -83,7 +83,15 @@ async function getDashboardData() {
     data.compra = compra;
 
   } catch (error) {
+    if (error.name === 'AuthApiError' || error.message?.includes('Refresh Token')) {
+      return { redirect: true };
+    }
     console.error('Error fetching dashboard data:', error);
+    // If we can't fetch the user due to another error, it's safer to redirect to login
+    // but we'll stick to returning the default data if it's just a DB error.
+    if (!data.membreNom || data.membreNom === 'Amic') {
+      return { redirect: true };
+    }
   }
 
   return data;

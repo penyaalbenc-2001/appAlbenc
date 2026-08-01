@@ -1,27 +1,55 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDiesFestes, submitFormulari } from './actions';
+
+const MAX_NOM = 100;
+
+async function fetchDiesFestes() {
+  const res = await fetch('/api/festes/formulari', { cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data.dies || [];
+}
 
 export default function FestesFormulariPage() {
   const [diesFestes, setDiesFestes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
-  
+
   const [nomCognoms, setNomCognoms] = useState('');
   const [esAdult, setEsAdult] = useState(true);
   const [diesSopar, setDiesSopar] = useState([]);
   const [diesCuinar, setDiesCuinar] = useState([]);
 
   useEffect(() => {
-    async function load() {
-      const data = await getDiesFestes();
-      setDiesFestes(data);
+    let cancelled = false;
+    fetchDiesFestes()
+      .then(dies => { if (!cancelled) setDiesFestes(dies); })
+      .catch(err => {
+        console.error(err);
+        if (!cancelled) setLoadError(err.message || 'No hi ha connexio.');
+      })
+      // Sempre s'apaga: abans, si la carrega fallava, la pagina es quedava
+      // eternament en "Carregant...".
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const retryLoad = async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      setDiesFestes(await fetchDiesFestes());
+    } catch (err) {
+      console.error(err);
+      setLoadError(err.message || 'No hi ha connexio.');
+    } finally {
       setLoading(false);
     }
-    load();
-  }, []);
+  };
 
   const handleToggleSopar = (fecha) => {
     if (diesSopar.includes(fecha)) {
@@ -47,22 +75,29 @@ export default function FestesFormulariPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
     if (!nomCognoms.trim()) {
-      alert('Per favor, escriu el teu nom i cognoms.');
+      setSubmitError('Per favor, escriu el teu nom i cognoms.');
       return;
     }
     setSubmitting(true);
     try {
-      await submitFormulari({
-        nomCognoms,
-        esAdult,
-        diesSopar,
-        diesCuinar: esAdult ? diesCuinar : []
+      const res = await fetch('/api/festes/formulari', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nomCognoms: nomCognoms.trim(),
+          esAdult,
+          diesSopar,
+          diesCuinar: esAdult ? diesCuinar : []
+        })
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
       setSuccess(true);
     } catch (err) {
       console.error(err);
-      alert('Error en enviar les dades. Torna a intentar-ho.');
+      setSubmitError(err.message || 'No s\'ha pogut enviar. Comprova la connexio i torna a provar.');
     } finally {
       setSubmitting(false);
     }
@@ -103,6 +138,14 @@ export default function FestesFormulariPage() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>Carregant dies de festes...</div>
+      ) : loadError ? (
+        <div style={{ textAlign: 'center', padding: '30px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px' }}>
+          <p style={{ color: '#b91c1c', fontWeight: 'bold', marginBottom: '15px' }}>No s&apos;han pogut carregar els dies.</p>
+          <p style={{ color: '#7f1d1d', fontSize: '14px', marginBottom: '20px' }}>{loadError}</p>
+          <button type="button" onClick={retryLoad} style={{ padding: '12px 20px', background: 'var(--primary-green)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Tornar a provar
+          </button>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           
@@ -116,6 +159,7 @@ export default function FestesFormulariPage() {
               value={nomCognoms} 
               onChange={e => setNomCognoms(e.target.value)} 
               placeholder="Ex: Joan Garcia Perez"
+              maxLength={MAX_NOM}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px', marginBottom: '15px' }}
               required
             />
@@ -188,7 +232,13 @@ export default function FestesFormulariPage() {
           </div>
 
           {/* SUBMIT */}
-          <button 
+          {submitError && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '14px', borderRadius: '8px', fontSize: '15px' }}>
+              ⚠️ {submitError}
+            </div>
+          )}
+
+          <button
             type="submit" 
             disabled={submitting}
             style={{ 

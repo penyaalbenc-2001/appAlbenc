@@ -284,9 +284,8 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
         </div>
 
         {/* Comensals (Només Lectura) */}
-        {!isDiaPenyes && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>
                 {(() => {
                   const comensalsAquestDia = respostes.filter(r => {
@@ -402,7 +401,6 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
               })()}
             </div>
           </div>
-        )}
 
         {/* Programació del dia */}
         <div style={{ marginTop: 'auto', paddingTop: '15px' }}>
@@ -491,7 +489,11 @@ export default function FestesPage() {
         gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
         gap: '20px' 
       }}>
-        {diesFestes.map((dia, idx) => {
+        {diesFestes.filter(dia => {
+          const today = new Date();
+          const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+          return dia.fecha >= todayStr;
+        }).map((dia, idx) => {
           const isDiaPenyes = dia.fecha === '2026-08-10';
           const programacion = programacion2026[dia.fecha] || [];
 

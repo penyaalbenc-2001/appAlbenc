@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getDiesFestes } from '../formulari/actions';
-import { getRespostes, deleteResposta } from './actions';
+import { getRespostes, deleteResposta, updateResposta } from './actions';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -12,6 +12,10 @@ export default function RespostesFestesPage() {
   const [respostes, setRespostes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Edit State
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -51,8 +55,6 @@ export default function RespostesFestesPage() {
         windowWidth: element.scrollWidth, 
         width: element.scrollWidth 
       },
-      // Usar altura dinámica basada en las filas para que quepa todo en 1 página,
-      // pero forzando formato vertical (portrait).
       jsPDF:        { 
         unit: 'px', 
         format: [Math.max(element.scrollWidth + 40, 600), Math.max(element.scrollHeight + 60, 800)], 
@@ -60,7 +62,6 @@ export default function RespostesFestesPage() {
       }
     };
     
-    // Temporarily remove overflow to ensure full capture if screen is small
     const parent = element.parentElement;
     const originalOverflow = parent.style.overflowX;
     parent.style.overflowX = 'visible';
@@ -71,7 +72,7 @@ export default function RespostesFestesPage() {
   };
 
   const formatDay = (dateStr) => {
-    return dateStr.split('-')[2]; // YYYY-MM-DD -> DD
+    return dateStr.split('-')[2];
   };
 
   const formatName = (fullName) => {
@@ -92,6 +93,70 @@ export default function RespostesFestesPage() {
       const resp = await getRespostes();
       setRespostes(resp);
     }
+  };
+
+  const startEdit = (resp) => {
+    setEditingId(resp.id);
+    setEditForm({
+      nom_cognoms: resp.nom_cognoms,
+      es_adult: resp.es_adult,
+      dies_sopar: typeof resp.dies_sopar === 'string' ? JSON.parse(resp.dies_sopar) : (resp.dies_sopar || []),
+      dies_cuinar: typeof resp.dies_cuinar === 'string' ? JSON.parse(resp.dies_cuinar) : (resp.dies_cuinar || [])
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.nom_cognoms.trim()) {
+      alert("El nom no pot estar buit.");
+      return;
+    }
+    
+    await updateResposta(
+      editingId,
+      editForm.nom_cognoms,
+      editForm.es_adult,
+      editForm.dies_sopar,
+      editForm.dies_cuinar
+    );
+    
+    setEditingId(null);
+    setEditForm(null);
+    const resp = await getRespostes();
+    setRespostes(resp);
+  };
+
+  const toggleDayState = (fecha) => {
+    if (!editForm) return;
+
+    const veSopar = editForm.dies_sopar.includes(fecha);
+    const potCuinar = editForm.dies_cuinar.includes(fecha);
+
+    let newSopar = [...editForm.dies_sopar];
+    let newCuinar = [...editForm.dies_cuinar];
+
+    // Cycle: None -> Sopar -> Sopar+Cuinar -> None
+    if (!veSopar && !potCuinar) {
+      // Move to Sopar
+      newSopar.push(fecha);
+    } else if (veSopar && !potCuinar) {
+      // Move to Sopar+Cuinar
+      newCuinar.push(fecha);
+    } else {
+      // Move to None
+      newSopar = newSopar.filter(d => d !== fecha);
+      newCuinar = newCuinar.filter(d => d !== fecha);
+    }
+
+    setEditForm({
+      ...editForm,
+      dies_sopar: newSopar,
+      dies_cuinar: newCuinar
+    });
   };
 
   if (loading) return <div style={{textAlign:'center', marginTop:'50px'}}>Carregant resultats...</div>;
@@ -127,25 +192,43 @@ export default function RespostesFestesPage() {
                     {formatDay(dia.fecha)}
                   </th>
                 ))}
+                {isAdmin && <th data-html2canvas-ignore="true" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center' }}>Accions</th>}
               </tr>
             </thead>
             <tbody>
               {respostes.map((resp, i) => {
-                const diesCuinarArr = typeof resp.dies_cuinar === 'string' ? JSON.parse(resp.dies_cuinar) : (resp.dies_cuinar || []);
-                const diesSoparArr = typeof resp.dies_sopar === 'string' ? JSON.parse(resp.dies_sopar) : (resp.dies_sopar || []);
+                const isEditing = editingId === resp.id;
+                
+                const diesCuinarArr = isEditing ? editForm.dies_cuinar : (typeof resp.dies_cuinar === 'string' ? JSON.parse(resp.dies_cuinar) : (resp.dies_cuinar || []));
+                const diesSoparArr = isEditing ? editForm.dies_sopar : (typeof resp.dies_sopar === 'string' ? JSON.parse(resp.dies_sopar) : (resp.dies_sopar || []));
                 
                 return (
-                  <tr key={resp.id} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : 'white', fontSize: '10px' }}>
+                  <tr key={resp.id} style={{ backgroundColor: isEditing ? '#fffbeb' : (i % 2 === 0 ? '#f8fafc' : 'white'), fontSize: '10px' }}>
                     <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', fontWeight: '500', whiteSpace: 'nowrap', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {formatName(resp.nom_cognoms)}
-                      {isAdmin && (
-                        <button data-html2canvas-ignore="true" onClick={() => handleDelete(resp.id)} style={{ marginLeft: '6px', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }} title="Eliminar resposta">
-                          🗑️
-                        </button>
+                      {isEditing ? (
+                        <input 
+                          type="text" 
+                          value={editForm.nom_cognoms} 
+                          onChange={(e) => setEditForm({...editForm, nom_cognoms: e.target.value})} 
+                          style={{ width: '100%', fontSize: '10px', padding: '2px' }}
+                        />
+                      ) : (
+                        formatName(resp.nom_cognoms)
                       )}
                     </td>
                     <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '12px' }}>
-                      <span title={resp.es_adult ? 'Adult' : 'Xiquet'}>{resp.es_adult ? '👨🏽' : '👧🏽'}</span>
+                      {isEditing ? (
+                        <select 
+                          value={editForm.es_adult ? 'true' : 'false'}
+                          onChange={(e) => setEditForm({...editForm, es_adult: e.target.value === 'true'})}
+                          style={{ fontSize: '10px', padding: '1px' }}
+                        >
+                          <option value="true">👨🏽 Adult</option>
+                          <option value="false">👧🏽 Xiquet</option>
+                        </select>
+                      ) : (
+                        <span title={resp.es_adult ? 'Adult' : 'Xiquet'}>{resp.es_adult ? '👨🏽' : '👧🏽'}</span>
+                      )}
                     </td>
                     <td style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', whiteSpace: 'nowrap' }}>
                       {resp.created_at ? new Date(resp.created_at).toLocaleDateString('ca-ES') : '-'}
@@ -157,13 +240,16 @@ export default function RespostesFestesPage() {
                       return (
                         <td 
                           key={dia.id || `td-${idx}`} 
+                          onClick={() => isEditing && toggleDayState(dia.fecha)}
                           style={{ 
                             padding: '2px', 
                             border: '1px solid #cbd5e1', 
                             textAlign: 'center',
                             backgroundColor: potCuinar ? '#bbf7d0' : (veSopar ? '#f1f5f9' : 'transparent'),
                             fontWeight: potCuinar ? 'bold' : 'normal',
-                            color: potCuinar ? '#166534' : 'inherit'
+                            color: potCuinar ? '#166534' : 'inherit',
+                            cursor: isEditing ? 'pointer' : 'default',
+                            userSelect: 'none'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', fontSize: '14px' }}>
@@ -173,6 +259,25 @@ export default function RespostesFestesPage() {
                         </td>
                       );
                     })}
+                    {isAdmin && (
+                      <td data-html2canvas-ignore="true" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        {isEditing ? (
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            <button onClick={handleSaveEdit} style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 4px', fontSize: '9px' }}>✓ Guardar</button>
+                            <button onClick={cancelEdit} style={{ background: '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 4px', fontSize: '9px' }}>✕ Canc</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button onClick={() => startEdit(resp)} style={{ background: 'none', border: 'none', color: 'var(--primary-blue)', cursor: 'pointer', padding: 0 }} title="Editar">
+                              ✏️
+                            </button>
+                            <button onClick={() => handleDelete(resp.id)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }} title="Eliminar resposta">
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -200,6 +305,7 @@ export default function RespostesFestesPage() {
                     </td>
                   );
                 })}
+                {isAdmin && <td data-html2canvas-ignore="true" style={{ border: '1px solid #cbd5e1' }}></td>}
               </tr>
               <tr style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', fontSize: '10px' }}>
                 <td colSpan="3" style={{ padding: '4px 2px', border: '1px solid #cbd5e1', textAlign: 'right' }}>Voluntaris Cuina:</td>
@@ -210,6 +316,7 @@ export default function RespostesFestesPage() {
                   }).length;
                   return <td key={`tot-cuina-${idx}`} style={{ padding: '2px', border: '1px solid #cbd5e1', textAlign: 'center', color: '#166534' }}>{totalCuiners}</td>;
                 })}
+                {isAdmin && <td data-html2canvas-ignore="true" style={{ border: '1px solid #cbd5e1' }}></td>}
               </tr>
             </tfoot>
           </table>

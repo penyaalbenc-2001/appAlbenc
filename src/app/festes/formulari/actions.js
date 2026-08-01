@@ -13,12 +13,5 @@ export async function getDiesFestes() {
   return rows;
 }
 
-export async function submitFormulari(data) {
-  const { nomCognoms, esAdult, diesSopar, diesCuinar } = data;
-  
-  const { rows } = await db.query(
-    "INSERT INTO festes_assistencia (nom_cognoms, es_adult, dies_sopar, dies_cuinar) VALUES ($1, $2, $3, $4) RETURNING *",
-    [nomCognoms, esAdult, JSON.stringify(diesSopar), JSON.stringify(diesCuinar)]
-  );
-  return rows[0];
-}
+// L'enviament del formulari public viu a /api/festes/formulari (route handler),
+// perque un Server Action deixa de funcionar si el client te un build antic.
