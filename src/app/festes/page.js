@@ -61,12 +61,12 @@ const programacion2026 = {
   ]
 };
 
-function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooksArray, isDiaPenyes, onUpdate }) {
+function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooksArray, isDiaPenyes, isAdmin, onUpdate }) {
   const [editingMenu, setEditingMenu] = useState(false);
   const [menuText, setMenuText] = useState(dia.informacion || '');
   const [savingMenu, setSavingMenu] = useState(false);
 
-  const initialCooks = dia.cocineros ? dia.cocineros.split(/[,i]+/).map(c => c.trim()).filter(Boolean) : [];
+  const initialCooks = dia.cocineros ? dia.cocineros.split(/, | i /).map(c => c.trim()).filter(Boolean) : [];
   const [savingCooks, setSavingCooks] = useState(false);
   const [addingCook, setAddingCook] = useState(false);
   const [newCookName, setNewCookName] = useState('');
@@ -173,7 +173,7 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: 0 }}>🧑‍🍳 Cuiners</h3>
-              {!addingCook && (
+              {!addingCook && isAdmin && (
                 <button onClick={() => setAddingCook(true)} style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--primary-blue)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
                   + Afegir
                 </button>
@@ -187,14 +187,16 @@ function DiaFestaCard({ dia, programacion, userName, respostes, allAssignedCooks
                 initialCooks.map((cook, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--primary-blue-light)', color: 'var(--primary-blue-dark)', padding: '4px 10px', borderRadius: '16px', fontSize: '13px', fontWeight: '500' }}>
                     {formatName(cook)}
-                    <button 
-                      onClick={() => handleRemoveCook(cook)} 
-                      disabled={savingCooks}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--primary-blue-dark)', cursor: savingCooks ? 'wait' : 'pointer', padding: 0, display: 'flex', alignItems: 'center', opacity: 0.7 }}
-                      title="Eliminar cuiner"
-                    >
-                      ✖
-                    </button>
+                    {isAdmin && (
+                      <button 
+                        onClick={() => handleRemoveCook(cook)} 
+                        disabled={savingCooks}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--primary-blue-dark)', cursor: savingCooks ? 'wait' : 'pointer', padding: 0, display: 'flex', alignItems: 'center', opacity: 0.7 }}
+                        title="Eliminar cuiner"
+                      >
+                        ✖
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -428,6 +430,7 @@ export default function FestesPage() {
   const [diesFestes, setDiesFestes] = useState([]);
   const [respostes, setRespostes] = useState([]);
   const [userName, setUserName] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -436,6 +439,7 @@ export default function FestesPage() {
       return;
     }
     setUserName(user.user_metadata?.full_name || user.email);
+    setIsAdmin(user.email === 'penyaalbenc@gmail.com');
     
     const [dies, respostesList] = await Promise.all([
       getDiesFestesAmbDades(),
@@ -447,7 +451,95 @@ export default function FestesPage() {
     setLoading(false);
   };
 
-  const allAssignedCooksArray = diesFestes.flatMap(d => d.cocineros ? d.cocineros.split(/[,i]+/).map(c => c.trim()).filter(Boolean) : []);
+  const allAssignedCooksArray = diesFestes.flatMap(d => d.cocineros ? d.cocineros.split(/, | i /).map(c => c.trim()).filter(Boolean) : []);
+
+  const handleExportPDF = async () => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf')
+    ]);
+    const element = document.getElementById('quadrant-festes');
+
+    const originalWidth = element.style.width;
+    const originalGridTemplateColumns = element.style.gridTemplateColumns;
+    const originalGap = element.style.gap;
+
+    // Injectem un estil temporal per amagar els botons d'edició/esborrar i ajustar marges
+    const style = document.createElement('style');
+    style.innerHTML = `
+      #quadrant-festes button { display: none !important; }
+      #quadrant-festes { margin-top: 10px; }
+    `;
+    document.head.appendChild(style);
+
+    // Full A4 apaïsat menys uns marges simbòlics (en mm)
+    const MARGIN_MM = 4;
+    const PAGE_W_MM = 297, PAGE_H_MM = 210;
+    const maxWmm = PAGE_W_MM - MARGIN_MM * 2;
+    const maxHmm = PAGE_H_MM - MARGIN_MM * 2;
+
+    // Provem combinacions de columnes i amplada de targeta, i ens quedem amb la
+    // que dibuixa el quadrant més gran dins d'una sola fulla. Deixar variar
+    // l'amplada de la targeta és el que fa que la proporció s'acosti a la de
+    // l'A4 apaïsat i no sobri espai als laterals.
+    const GAP = 12;
+    const CARD_WIDTHS = [260, 300, 340, 380, 430, 490, 560, 640, 740, 860];
+    const numCards = element.children.length || 1;
+    element.style.gap = `${GAP}px`;
+
+    const applyLayout = (cols, cardW) => {
+      element.style.width = `${cols * cardW + (cols - 1) * GAP}px`;
+      element.style.gridTemplateColumns = `repeat(${cols}, ${cardW}px)`;
+    };
+
+    let best = { cols: 1, cardW: CARD_WIDTHS[0], zoom: 0 };
+    for (let cols = 1; cols <= numCards; cols++) {
+      for (const cardW of CARD_WIDTHS) {
+        applyLayout(cols, cardW);
+        const zoom = Math.min(maxWmm / element.scrollWidth, maxHmm / element.scrollHeight);
+        if (zoom > best.zoom) best = { cols, cardW, zoom };
+      }
+    }
+    applyLayout(best.cols, best.cardW);
+
+    try {
+      const width = element.scrollWidth;
+      const height = element.scrollHeight;
+
+      const canvas = await html2canvas(element, {
+        // Prou resolució per imprimir, sense passar-nos dels límits del canvas
+        scale: Math.min(3, Math.max(1, 3800 / width)),
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width,
+        height,
+        // Renderitzem en una finestra prou ampla perquè no es talli res (també al mòbil)
+        windowWidth: width + 80,
+        windowHeight: height + 80
+      });
+
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+      // Escalem la imatge sencera perquè càpiga completa en una única pàgina
+      const ratio = Math.min(maxWmm / canvas.width, maxHmm / canvas.height);
+      const imgW = canvas.width * ratio;
+      const imgH = canvas.height * ratio;
+      pdf.addImage(
+        canvas.toDataURL('image/jpeg', 0.95),
+        'JPEG',
+        (PAGE_W_MM - imgW) / 2,
+        (PAGE_H_MM - imgH) / 2,
+        imgW,
+        imgH
+      );
+      pdf.save('quadrant_festes_2026.pdf');
+    } finally {
+      // Restaurar estils
+      element.style.width = originalWidth;
+      element.style.gridTemplateColumns = originalGridTemplateColumns;
+      element.style.gap = originalGap;
+      document.head.removeChild(style);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -464,6 +556,13 @@ export default function FestesPage() {
           <p style={{ color: 'var(--text-muted)', margin: '5px 0 0 0' }}>Organització, menús i programació</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleExportPDF}
+            className="btn-primary"
+            style={{ padding: '10px 15px', backgroundColor: '#eab308', borderColor: '#eab308', color: 'white' }}
+          >
+            📥 PDF Resum Festes
+          </button>
           <button 
             onClick={() => {
               const url = window.location.origin + '/festes/formulari';
@@ -484,7 +583,7 @@ export default function FestesPage() {
         </div>
       </div>
 
-      <div style={{ 
+      <div id="quadrant-festes" style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
         gap: '20px' 
@@ -506,6 +605,7 @@ export default function FestesPage() {
               respostes={respostes}
               allAssignedCooksArray={allAssignedCooksArray}
               isDiaPenyes={isDiaPenyes}
+              isAdmin={isAdmin}
               onUpdate={loadData}
             />
           );
