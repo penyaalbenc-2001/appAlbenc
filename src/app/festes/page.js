@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getDiesFestesAmbDades, updateMenuFesta, updateFestesCooks, addComensalFesta, removeComensalFesta } from './actions';
 import { getRespostes } from './respostes/actions';
+import { getMembreByUserId } from '../perfil/actions';
 import Link from 'next/link';
 
 const programacion2026 = {
@@ -438,7 +439,9 @@ export default function FestesPage() {
       router.push('/login');
       return;
     }
-    setUserName(user.user_metadata?.full_name || user.email);
+    const membre = await getMembreByUserId(user.id);
+    const nom = membre?.nom || user.user_metadata?.full_name || user.email;
+    setUserName(nom);
     setIsAdmin(user.email === 'penyaalbenc@gmail.com');
     
     const [dies, respostesList] = await Promise.all([

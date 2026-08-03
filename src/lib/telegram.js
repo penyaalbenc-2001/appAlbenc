@@ -7,6 +7,8 @@ export async function sendTelegramMessage(text) {
     return false;
   }
 
+  const messageWithHeader = `<b>NOVETATS - PENYA ALBENC</b>\n\n${text}`;
+
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
   try {
@@ -15,7 +17,7 @@ export async function sendTelegramMessage(text) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: text,
+        text: messageWithHeader,
         parse_mode: 'HTML'
       })
     });
